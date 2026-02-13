@@ -60,12 +60,13 @@ CREATE TABLE IF NOT EXISTS incidents (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   resolved_at TIMESTAMP WITH TIME ZONE,
   affected_systems TEXT[],
-  external_reference_id VARCHAR(255),
-  INDEX idx_org_id (org_id),
-  INDEX idx_status (status),
-  INDEX idx_severity (severity),
-  INDEX idx_created_at (created_at DESC)
+  external_reference_id VARCHAR(255)
 );
+
+CREATE INDEX IF NOT EXISTS idx_incidents_org_id ON incidents(org_id);
+CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
+CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity);
+CREATE INDEX IF NOT EXISTS idx_incidents_created_at ON incidents(created_at DESC);
 
 -- ============================================================================
 -- 4. VULNERABILITIES (CVE tracking)
@@ -91,12 +92,13 @@ CREATE TABLE IF NOT EXISTS vulnerabilities (
   patched_date TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES users(id),
-  INDEX idx_org_id (org_id),
-  INDEX idx_cve_id (cve_id),
-  INDEX idx_status (status),
-  INDEX idx_severity (severity)
+  created_by UUID REFERENCES users(id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_org_id ON vulnerabilities(org_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_cve_id ON vulnerabilities(cve_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_status ON vulnerabilities(status);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_severity ON vulnerabilities(severity);
 
 -- ============================================================================
 -- 5. INCIDENT-VULNERABILITY RELATIONS (many-to-many)
@@ -118,10 +120,11 @@ CREATE TABLE IF NOT EXISTS comments (
   author_id UUID NOT NULL REFERENCES users(id),
   content TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  INDEX idx_incident_id (incident_id),
-  INDEX idx_created_at (created_at DESC)
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_comments_incident_id ON comments(incident_id);
+CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at DESC);
 
 -- ============================================================================
 -- 7. ALERTS & NOTIFICATIONS
@@ -142,11 +145,12 @@ CREATE TABLE IF NOT EXISTS alerts (
   body TEXT,
   sent_at TIMESTAMP WITH TIME ZONE,
   failed_reason TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  INDEX idx_org_id (org_id),
-  INDEX idx_status (status),
-  INDEX idx_created_at (created_at DESC)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_alerts_org_id ON alerts(org_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
+CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts(created_at DESC);
 
 -- ============================================================================
 -- 8. AUDIT LOGS (compliance & tracking)
@@ -166,12 +170,13 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   new_values JSONB,
   ip_address VARCHAR(45),
   user_agent TEXT,
-  timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  INDEX idx_org_id (org_id),
-  INDEX idx_user_id (user_id),
-  INDEX idx_resource_type (resource_type),
-  INDEX idx_timestamp (timestamp DESC)
+  timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_org_id ON audit_logs(org_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource_type ON audit_logs(resource_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
 
 -- ============================================================================
 -- 9. API KEYS (for integrations)
@@ -185,10 +190,11 @@ CREATE TABLE IF NOT EXISTS api_keys (
   last_used_at TIMESTAMP WITH TIME ZONE,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  expires_at TIMESTAMP WITH TIME ZONE,
-  INDEX idx_org_id (org_id),
-  INDEX idx_key_hash (key_hash)
+  expires_at TIMESTAMP WITH TIME ZONE
 );
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_org_id ON api_keys(org_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash);
 
 -- ============================================================================
 -- 10. WEBHOOK CONFIGURATIONS
@@ -201,9 +207,10 @@ CREATE TABLE IF NOT EXISTS webhooks (
   events VARCHAR(50)[],
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  INDEX idx_org_id (org_id)
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_webhooks_org_id ON webhooks(org_id);
 
 -- ============================================================================
 -- 11. NOTIFICATION PREFERENCES
@@ -247,15 +254,11 @@ CREATE POLICY org_isolation_policy ON users
 -- These will be more comprehensive after JWT validation is implemented
 
 -- ============================================================================
--- INDEXES FOR PERFORMANCE
+-- ADDITIONAL INDEXES FOR PERFORMANCE
 -- ============================================================================
 CREATE INDEX IF NOT EXISTS idx_users_org_id ON users(org_id);
-CREATE INDEX IF NOT EXISTS idx_incidents_org_id ON incidents(org_id);
 CREATE INDEX IF NOT EXISTS idx_incidents_assigned_to ON incidents(assigned_to);
-CREATE INDEX IF NOT EXISTS idx_vulnerabilities_org_id ON vulnerabilities(org_id);
 CREATE INDEX IF NOT EXISTS idx_comments_author_id ON comments(author_id);
-CREATE INDEX IF NOT EXISTS idx_alerts_org_id ON alerts(org_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_org_id ON audit_logs(org_id);
 
 -- ============================================================================
 -- COMMENTS & SCHEMA NOTES
