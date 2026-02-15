@@ -48,15 +48,15 @@ FRONTEND_DOMAIN = "https://v0-cybersecurity-tracker-dashboard-opal.vercel.app/" 
 allowed_origins = [
     FRONTEND_DOMAIN,
     "http://localhost:3000",
-    "http://127.0.0.1:3000"
+    "https://v0-cybersecurity-tracker-dashboard-opal.vercel.app/" # production frontend
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"], # allow POST, GET, OPTIONS, etc
+    allow_headers=["*"], # allow headers like Content-Type, Authorization
 )
 
 # ============================================================================
