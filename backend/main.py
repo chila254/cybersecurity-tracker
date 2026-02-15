@@ -47,7 +47,7 @@ FRONTEND_DOMAIN = "https://v0-cybersecurity-tracker-dashboard-opal.vercel.app/" 
 # You can also allow localhost for local testing
 allowed_origins = [
     FRONTEND_DOMAIN,
-    "http://localhost:3000",
+    "http://localhost:8000",
     "https://v0-cybersecurity-tracker-dashboard-opal.vercel.app/" # production frontend
 ]
 
