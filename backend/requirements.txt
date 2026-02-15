@@ -11,7 +11,7 @@ python-dotenv==1.0.1
 
 # Pydantic
 pydantic==1.10.12
-pydantic-settings==2.5.0
+pydantic-settings==1.10.2  # compatible with Pydantic 1.x
 
 # Security & authentication
 bcrypt==4.1.3
