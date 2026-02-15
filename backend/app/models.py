@@ -215,3 +215,21 @@ class NotificationPreference(Base):
     email_digest = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id = Column(PG_UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    incident_id = Column(PG_UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=True)
+    message = Column(Text, nullable=False)
+    alert_type = Column(String(50), nullable=True)  # e.g., "email", "system"
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    organization = relationship("Organization")
+    user = relationship("User")
+    incident = relationship("Incident")
