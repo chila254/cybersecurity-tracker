@@ -17,7 +17,10 @@ load_dotenv()
 # Import routers
 from app.routes import auth, incidents, vulnerabilities, dashboard, alerts, integrations
 
-# Initialize FastAPI app
+# ============================================================================
+# FastAPI Lifespan for startup/shutdown logs
+# ============================================================================
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -26,6 +29,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     print("🛑 Incident Tracker API shutting down...")
 
+# Initialize FastAPI app
 app = FastAPI(
     title="Cybersecurity Incident Tracker API",
     description="Enterprise-grade incident and vulnerability management platform",
@@ -33,8 +37,19 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# ============================================================================
 # CORS Configuration
-allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+# ============================================================================
+
+# Add your frontend domain here
+FRONTEND_DOMAIN = "https://v0-cybersecurity-tracker-dashboard-opal.vercel.app/"  # replace with your actual frontend URL
+
+# You can also allow localhost for local testing
+allowed_origins = [
+    FRONTEND_DOMAIN,
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,7 +59,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Security scheme
+# ============================================================================
+# Security
+# ============================================================================
+
 security = HTTPBearer()
 
 # ============================================================================
@@ -91,11 +109,15 @@ app.include_router(dashboard.router, prefix="/api")
 app.include_router(alerts.router, prefix="/api")
 app.include_router(integrations.router, prefix="/api")
 
+# ============================================================================
+# Run app
+# ============================================================================
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=int(os.getenv("PORT", 8000)),  # Use PORT env var if provided by Render
         reload=True
     )
