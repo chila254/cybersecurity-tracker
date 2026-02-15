@@ -76,7 +76,7 @@ def verify_token(token: str) -> dict:
 # Dependency for FastAPI route protection
 # ============================================================================
 
-async def get_current_user(credentials: HTTPAuthCredentials = Depends(security)) -> dict:
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
     """
     Dependency to verify JWT token and get current user
     Usage: def protected_route(current_user: dict = Depends(get_current_user))
