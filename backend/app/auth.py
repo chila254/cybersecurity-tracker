@@ -1,25 +1,25 @@
 """
-Authentication and security routes
-Includes register, login, and JWT token handling
+Authentication and security utilities
+Includes register, login, JWT token handling, and route protection
 """
 
-from datetime import timedelta, timezone, datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 
+from passlib.context import CryptContext
+from jose import jwt, JWTError
+
+# For database
 from app.models import User, Organization
 from app.database import SessionLocal
 from sqlalchemy.orm import Session
 
-from passlib.context import CryptContext
-from jose import jwt, JWTError
-
-# Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -33,11 +33,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
-
 router = APIRouter()
 
 # ===========================================================
-# Pydantic Schemas
+# Schemas
 # ===========================================================
 
 class RegisterSchema(BaseModel):
@@ -55,7 +54,18 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 # ===========================================================
-# Utility Functions
+# Database Dependency
+# ===========================================================
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# ===========================================================
+# Utilities
 # ===========================================================
 
 def hash_password(password: str) -> str:
@@ -84,31 +94,55 @@ def verify_token(token: str) -> dict:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# ===========================================================
+# Route Protection Dependencies
+# ===========================================================
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    token = credentials.credentials
+    payload = verify_token(token)
+
+    user_id: str = payload.get("sub")
+    org_id: str = payload.get("org_id")
+    role: str = payload.get("role")
+
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return {
+        "user_id": UUID(user_id),
+        "org_id": UUID(org_id),
+        "role": role
+    }
+
+def require_role(required_role: str):
+    async def check_role(current_user: dict = Depends(get_current_user)) -> dict:
+        if current_user["role"] != required_role and current_user["role"] != "ADMIN":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions"
+            )
+        return current_user
+    return check_role
 
 # ===========================================================
-# Routes
+# Authentication Routes
 # ===========================================================
 
 @router.post("/register", response_model=TokenResponse)
 def register_user(user: RegisterSchema, db: Session = Depends(get_db)):
-    # Check if email exists
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Create organization
     org = Organization(name=user.org_name)
     db.add(org)
     db.commit()
     db.refresh(org)
 
-    # Create user
     new_user = User(
         name=user.name,
         email=user.email,
@@ -120,7 +154,6 @@ def register_user(user: RegisterSchema, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    # Create JWT token
     token = create_access_token({"sub": str(new_user.id), "org_id": str(org.id), "role": new_user.role})
     return {"access_token": token, "token_type": "bearer"}
 
@@ -128,19 +161,8 @@ def register_user(user: RegisterSchema, db: Session = Depends(get_db)):
 @router.post("/login", response_model=TokenResponse)
 def login_user(credentials: LoginSchema, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == credentials.email).first()
-    if not user:
-        raise HTTPException(status_code=400, detail="Invalid email or password")
-
-    if not verify_password(credentials.password, user.password_hash):
+    if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
     token = create_access_token({"sub": str(user.id), "org_id": str(user.org_id), "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
-
-
-# Optional protected route example
-@router.get("/me")
-def get_me(current_user: dict = Depends(security)):
-    token = current_user.credentials
-    payload = verify_token(token)
-    return {"user_id": payload.get("sub"), "org_id": payload.get("org_id"), "role": payload.get("role")}
