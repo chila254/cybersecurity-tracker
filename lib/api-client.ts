@@ -3,7 +3,7 @@
  * Handles authentication, request/response, error handling
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://cybersecurity-tracker.onrender.com/api'
 
 interface ApiResponse<T> {
   data?: T
