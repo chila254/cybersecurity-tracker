@@ -27,10 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check if user is already logged in
     const token = localStorage.getItem('access_token')
     const userData = localStorage.getItem('user')
-    
     if (token && userData) {
       try {
         setUser(JSON.parse(userData))
@@ -40,19 +38,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('user')
       }
     }
-    
     setLoading(false)
   }, [])
 
   const login = async (email: string, password: string) => {
     const { data, error } = await apiClient.post('/auth/login', { email, password })
-    
     if (error) throw new Error(error)
-    
+
     const token = (data as any).access_token
     apiClient.setToken(token)
-    
-    // Decode JWT to get user info (simple decode, not validation)
+
     const parts = token.split('.')
     if (parts.length === 3) {
       const payload = JSON.parse(atob(parts[1]))
@@ -69,19 +64,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const register = async (orgName: string, email: string, password: string, name: string) => {
+    // 🔹 Log values before sending to API
+    console.log('Register payload:', { org_name: orgName, email, password, name })
+
     const { data, error } = await apiClient.post('/auth/register', {
-      org_name: orgName,
+      org_name: orgName, // matches FastAPI schema
       email,
       password,
-      full_name: name,
+      name, // must be "name", NOT full_name
     })
-    
+
     if (error) throw new Error(error)
-    
+
     const token = (data as any).access_token
     apiClient.setToken(token)
-    
-    // Decode JWT to get user info
+
     const parts = token.split('.')
     if (parts.length === 3) {
       const payload = JSON.parse(atob(parts[1]))
