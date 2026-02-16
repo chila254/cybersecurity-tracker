@@ -6,12 +6,15 @@ from sqlalchemy.orm import sessionmaker
 import os
 from datetime import datetime
 
-# ---- STEP 1: Load your database URL ----
-# You can also set this in your environment variables
+# ---- STEP 1: Load your database URL from environment variables ----
 DATABASE_URL = os.getenv(
     "POSTGRES_URL_NON_POOLING",
-    "postgres://postgres.dtjfhdcclrccqyvnkxdh:1HGoXYAkN710dOFH@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
+    "postgresql://postgres.dtjfhdcclrccqyvnkxdh:1HGoXYAkN710dOFH@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
 )
+
+# Fix old postgres:// URLs if they exist
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # ---- STEP 2: Create SQLAlchemy engine ----
 engine = create_engine(DATABASE_URL, echo=True)
@@ -38,5 +41,6 @@ def create_tables():
     Base.metadata.create_all(bind=engine)
     print("✅ All tables created successfully!")
 
+# ---- Optional: Run create_tables if file executed directly ----
 if __name__ == "__main__":
     create_tables()
