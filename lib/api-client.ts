@@ -87,9 +87,20 @@ class ApiClient {
       console.log('[v0] API Response:', { status: response.status, data })
 
       if (!response.ok) {
-        const errorMessage = (data as ApiError).detail || (data as ApiError).error || 'An error occurred'
-        console.error('[v0] API Error:', errorMessage)
-        return { error: errorMessage }
+  let errorMessage = 'An error occurred'
+
+  if (Array.isArray((data as any).detail)) {
+    errorMessage = (data as any).detail.map((d: any) => d.msg).join(', ')
+  } else {
+    errorMessage =
+      (data as ApiError).detail ||
+      (data as ApiError).error ||
+      JSON.stringify(data)
+  }
+
+  console.error('[v0] API Error:', errorMessage)
+  return { error: errorMessage }
+      }
       }
 
       return { data: data as T }
