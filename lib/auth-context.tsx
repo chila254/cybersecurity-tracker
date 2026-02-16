@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       org_name: orgName,
       email,
       password,
-      name,
+      full_name: name,
     })
     
     if (error) throw new Error(error)
