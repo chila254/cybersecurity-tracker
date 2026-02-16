@@ -71,12 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (orgName: string, email: string, password: string, name: string) => {
     const { data, error } = await apiClient.post('/auth/register', {
       org_name: orgName,
-      user_data: {
-        email,
-        password,
-        name,
-        role: 'ADMIN',
-      },
+      email,
+      password,
+      name,
     })
     
     if (error) throw new Error(error)
