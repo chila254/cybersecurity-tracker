@@ -56,7 +56,12 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<{ data?: T; error?: string }> {
     const url = `${this.baseUrl}${endpoint}`
-    console.log('[v0] API Request:', { url, method: options.method || 'GET' })
+    console.log('[v0] API Request:', { 
+      url, 
+      method: options.method || 'GET',
+      baseUrl: this.baseUrl,
+      apiUrl: process.env.NEXT_PUBLIC_API_URL
+    })
 
     try {
       const response = await fetch(url, {
@@ -65,6 +70,8 @@ class ApiClient {
           ...this.getHeaders(),
           ...(options.headers || {}),
         },
+        mode: 'cors',
+        credentials: 'include',
       })
 
       // Handle 401 Unauthorized
@@ -88,7 +95,12 @@ class ApiClient {
       return { data: data as T }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Network error'
-      console.error('[v0] API Exception:', errorMessage, error)
+      console.error('[v0] API Exception:', {
+        message: errorMessage,
+        url: `${this.baseUrl}${endpoint}`,
+        env: process.env.NEXT_PUBLIC_API_URL,
+        error: error
+      })
       return { error: errorMessage }
     }
   }
