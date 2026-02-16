@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, Organization
 from app.schemas import UserCreate, LoginRequest, TokenResponse, UserResponse
+from pydantic import BaseModel
 from app.auth import hash_password, verify_password, create_access_token
 from datetime import timedelta
 from uuid import uuid4
@@ -15,20 +16,29 @@ from uuid import uuid4
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # ============================================================================
+# Request/Response Schemas
+# ============================================================================
+
+class RegisterRequest(BaseModel):
+    org_name: str
+    name: str
+    email: str
+    password: str
+
+# ============================================================================
 # Register New Organization & Admin User
 # ============================================================================
 
 @router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def register(
-    org_name: str,
-    user_data: UserCreate,
+    data: RegisterRequest,
     db: Session = Depends(get_db)
 ):
     """
     Register a new organization with admin user
     """
     # Check if email already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    existing_user = db.query(User).filter(User.email == data.email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -37,16 +47,16 @@ async def register(
     
     try:
         # Create organization
-        org = Organization(name=org_name)
+        org = Organization(name=data.org_name)
         db.add(org)
         db.flush()
         
         # Create admin user
         user = User(
             org_id=org.id,
-            email=user_data.email,
-            password_hash=hash_password(user_data.password),
-            name=user_data.name,
+            email=data.email,
+            password_hash=hash_password(data.password),
+            name=data.name,
             role="ADMIN"
         )
         db.add(user)

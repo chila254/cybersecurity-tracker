@@ -41,14 +41,15 @@ app = FastAPI(
 # CORS Configuration
 # ============================================================================
 
-# Add your frontend domain here
-FRONTEND_DOMAIN = "https://v0-cybersecurity-tracker-dashboard-opal.vercel.app/"  # replace with your actual frontend URL
+# Add your frontend domain here (WITHOUT trailing slash)
+FRONTEND_DOMAIN = "https://v0-cybersecurity-tracker-dashboard-opal.vercel.app"
 
 # You can also allow localhost for local testing
 allowed_origins = [
     FRONTEND_DOMAIN,
+    "http://localhost:3000",
     "http://localhost:8000",
-    "https://v0-cybersecurity-tracker-dashboard-opal.vercel.app/" # production frontend
+    "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
