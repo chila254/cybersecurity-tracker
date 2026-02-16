@@ -1,18 +1,13 @@
 /**
  * API Client for communicating with FastAPI backend
- * Handles authentication, request/response, error handling
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://cybersecurity-tracker.onrender.com/api'
-
-interface ApiResponse<T> {
-  data?: T
-  error?: string
-  message?: string
-}
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://cybersecurity-tracker.onrender.com/api'
 
 interface ApiError {
-  detail?: string
+  detail?: any
   error?: string
   status_code?: number
 }
@@ -23,7 +18,7 @@ class ApiClient {
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl
-    // Load token from localStorage if available
+
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('access_token')
     }
@@ -56,12 +51,8 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<{ data?: T; error?: string }> {
     const url = `${this.baseUrl}${endpoint}`
-    console.log('[v0] API Request:', { 
-      url, 
-      method: options.method || 'GET',
-      baseUrl: this.baseUrl,
-      apiUrl: process.env.NEXT_PUBLIC_API_URL
-    })
+
+    console.log('[API Request]', url)
 
     try {
       const response = await fetch(url, {
@@ -74,73 +65,62 @@ class ApiClient {
         credentials: 'include',
       })
 
-      // Handle 401 Unauthorized
       if (response.status === 401) {
         this.clearToken()
-        // Redirect to login if in browser
         if (typeof window !== 'undefined') {
           window.location.href = '/login'
         }
       }
 
       const data = await response.json()
-      console.log('[v0] API Response:', { status: response.status, data })
+      console.log('[API Response]', data)
 
       if (!response.ok) {
-  let errorMessage = 'An error occurred'
+        let errorMessage = 'An error occurred'
 
-  if (Array.isArray((data as any).detail)) {
-    errorMessage = (data as any).detail.map((d: any) => d.msg).join(', ')
-  } else {
-    errorMessage =
-      (data as ApiError).detail ||
-      (data as ApiError).error ||
-      JSON.stringify(data)
-  }
+        if (Array.isArray(data.detail)) {
+          errorMessage = data.detail.map((d: any) => d.msg).join(', ')
+        } else if (data.detail) {
+          errorMessage = data.detail
+        } else if (data.error) {
+          errorMessage = data.error
+        } else {
+          errorMessage = JSON.stringify(data)
+        }
 
-  console.error('[v0] API Error:', errorMessage)
-  return { error: errorMessage }
-      }
+        console.error('[API Error]', errorMessage)
+        return { error: errorMessage }
       }
 
       return { data: data as T }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Network error'
-      console.error('[v0] API Exception:', {
-        message: errorMessage,
-        url: `${this.baseUrl}${endpoint}`,
-        env: process.env.NEXT_PUBLIC_API_URL,
-        error: error
-      })
+      const errorMessage =
+        error instanceof Error ? error.message : 'Network error'
+
+      console.error('[API Exception]', errorMessage)
       return { error: errorMessage }
     }
   }
 
-  async get<T>(endpoint: string): Promise<{ data?: T; error?: string }> {
+  async get<T>(endpoint: string) {
     return this.request<T>(endpoint, { method: 'GET' })
   }
 
-  async post<T>(
-    endpoint: string,
-    body?: unknown
-  ): Promise<{ data?: T; error?: string }> {
+  async post<T>(endpoint: string, body?: unknown) {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
     })
   }
 
-  async put<T>(
-    endpoint: string,
-    body?: unknown
-  ): Promise<{ data?: T; error?: string }> {
+  async put<T>(endpoint: string, body?: unknown) {
     return this.request<T>(endpoint, {
       method: 'PUT',
       body: body ? JSON.stringify(body) : undefined,
     })
   }
 
-  async delete<T>(endpoint: string): Promise<{ data?: T; error?: string }> {
+  async delete<T>(endpoint: string) {
     return this.request<T>(endpoint, { method: 'DELETE' })
   }
 }
