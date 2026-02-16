@@ -10,6 +10,8 @@ from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 from typing import Optional
+from create_tables import create_tables  # import your table-creation function
+create_tables()  # run it once to create all tables
 
 # Load environment variables
 load_dotenv()
