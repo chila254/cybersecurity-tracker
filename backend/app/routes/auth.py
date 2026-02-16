@@ -9,9 +9,7 @@ from app.database import get_db
 from app.models import User, Organization
 from app.schemas import UserCreate, LoginRequest, TokenResponse, UserResponse
 from pydantic import BaseModel
-from app.auth import hash_password, verify_password, create_access_token
-from datetime import timedelta
-from uuid import uuid4
+from app.auth import hash_password, verify_password, create_access_token, get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -49,11 +47,11 @@ async def register(
         # Create organization
         org = Organization(name=data.org_name)
         db.add(org)
-        db.flush()
-        
+        db.flush()  # ensures org.id is available
+
         # Create admin user
         user = User(
-            org_id=org.id,
+            org_id=org.id,               # UUID
             email=data.email,
             password_hash=hash_password(data.password),
             name=data.name,
@@ -61,11 +59,12 @@ async def register(
         )
         db.add(user)
         db.commit()
-        
+        db.refresh(user)  # get auto-incremented id
+
         # Create access token
         access_token = create_access_token(
             data={
-                "sub": str(user.id),
+                "sub": str(user.id),     # integer id as string
                 "org_id": str(org.id),
                 "email": user.email,
                 "role": user.role
@@ -75,7 +74,7 @@ async def register(
         return {
             "message": "Organization and admin user created successfully",
             "organization_id": str(org.id),
-            "user_id": str(user.id),
+            "user_id": user.id,  # keep integer
             "access_token": access_token,
             "token_type": "bearer"
         }
@@ -134,16 +133,12 @@ async def login(
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_profile(
-    current_user: dict = Depends(lambda: None),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get current authenticated user profile
-    Note: Proper dependency injection to be added
     """
-    from app.auth import get_current_user
-    current_user = await get_current_user(None)
-    
     user = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not user:
         raise HTTPException(
