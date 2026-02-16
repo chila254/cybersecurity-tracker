@@ -56,6 +56,7 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<{ data?: T; error?: string }> {
     const url = `${this.baseUrl}${endpoint}`
+    console.log('[v0] API Request:', { url, method: options.method || 'GET' })
 
     try {
       const response = await fetch(url, {
@@ -76,15 +77,18 @@ class ApiClient {
       }
 
       const data = await response.json()
+      console.log('[v0] API Response:', { status: response.status, data })
 
       if (!response.ok) {
         const errorMessage = (data as ApiError).detail || (data as ApiError).error || 'An error occurred'
+        console.error('[v0] API Error:', errorMessage)
         return { error: errorMessage }
       }
 
       return { data: data as T }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Network error'
+      console.error('[v0] API Exception:', errorMessage, error)
       return { error: errorMessage }
     }
   }
