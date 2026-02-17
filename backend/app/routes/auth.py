@@ -11,7 +11,7 @@ from app.schemas import UserCreate, LoginRequest, TokenResponse, UserResponse
 from pydantic import BaseModel
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(tags=["Authentication"])
 
 # ============================================================================
 # Request/Response Schemas
