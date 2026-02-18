@@ -63,7 +63,7 @@ app = FastAPI(
 # CORS Configuration
 # ============================================================================
 
-FRONTEND_DOMAIN = "https://v0-cybersecurity-tracker-dashboard-opal.vercel.app"
+FRONTEND_DOMAIN = "https://cybersecurity-tracker.vercel.app/"
 
 allowed_origins = [
     FRONTEND_DOMAIN,
