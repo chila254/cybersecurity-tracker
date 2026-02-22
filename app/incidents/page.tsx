@@ -40,6 +40,10 @@ export default function IncidentsPage() {
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [totalIncidents, setTotalIncidents] = useState(0)
+  
+  // Bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkStatus, setBulkStatus] = useState('')
 
   useEffect(() => {
     fetchIncidents()
@@ -74,6 +78,54 @@ export default function IncidentsPage() {
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value)
     setPage(0) // Reset to first page on new search
+  }
+
+  const toggleSelectIncident = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === incidents.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(incidents.map(i => i.id)))
+    }
+  }
+
+  const handleBulkStatusUpdate = async () => {
+    if (selectedIds.size === 0 || !bulkStatus) return
+
+    try {
+      for (const id of selectedIds) {
+        await apiClient.put(`/incidents/${id}`, { status: bulkStatus })
+      }
+      setSelectedIds(new Set())
+      setBulkStatus('')
+      fetchIncidents()
+    } catch (error) {
+      console.error('Failed to update incidents:', error)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!window.confirm(`Delete ${selectedIds.size} incident(s)?`)) return
+
+    try {
+      for (const id of selectedIds) {
+        await apiClient.delete(`/incidents/${id}`)
+      }
+      setSelectedIds(new Set())
+      fetchIncidents()
+    } catch (error) {
+      console.error('Failed to delete incidents:', error)
+    }
   }
 
   const handleCreateIncident = async (e: React.FormEvent) => {
@@ -198,6 +250,48 @@ export default function IncidentsPage() {
         </div>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <p className="text-white font-medium">{selectedIds.size} incident(s) selected</p>
+            <select
+              value={bulkStatus}
+              onChange={(e) => setBulkStatus(e.target.value)}
+              className="bg-slate-800 text-white border border-slate-600 rounded px-3 py-2 text-sm"
+            >
+              <option value="">Update Status To...</option>
+              <option value="OPEN">Open</option>
+              <option value="INVESTIGATING">Investigating</option>
+              <option value="RESOLVED">Resolved</option>
+              <option value="CLOSED">Closed</option>
+            </select>
+            <Button
+              onClick={handleBulkStatusUpdate}
+              disabled={!bulkStatus}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Update
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleBulkDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete Selected
+            </Button>
+            <Button
+              onClick={() => setSelectedIds(new Set())}
+              variant="outline"
+              className="border-slate-600 text-slate-300"
+            >
+              Deselect
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Incidents List */}
       <div className="space-y-3">
         {loading ? (
@@ -212,8 +306,20 @@ export default function IncidentsPage() {
           incidents.map((incident) => (
             <div
               key={incident.id}
-              className="bg-slate-900 rounded-lg p-6 border border-slate-700 hover:border-slate-600 transition-colors cursor-pointer"
+              className={`bg-slate-900 rounded-lg p-6 border transition-colors ${
+                selectedIds.has(incident.id)
+                  ? 'border-blue-600 bg-slate-900/80'
+                  : 'border-slate-700 hover:border-slate-600'
+              }`}
             >
+              <div className="flex items-start gap-4">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(incident.id)}
+                  onChange={() => toggleSelectIncident(incident.id)}
+                  className="mt-1 w-4 h-4 accent-blue-600 cursor-pointer"
+                />
+                <div className="flex-1">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-white mb-2">{incident.title}</h3>
@@ -245,12 +351,14 @@ export default function IncidentsPage() {
                   </div>
                 </div>
               )}
-            </div>
-          ))
-        )}
-      </div>
+              </div>
+               </div>
+              </div>
+              ))
+              )}
+              </div>
 
-      {/* Pagination */}
+              {/* Pagination */}
       {!loading && incidents.length > 0 && (
         <div className="flex items-center justify-between mt-6 bg-slate-900 rounded-lg p-4 border border-slate-700">
           <div className="text-sm text-slate-400">
