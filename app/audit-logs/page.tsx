@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search } from 'lucide-react'
+import { FileText, Plus, Trash2, Edit } from 'lucide-react'
 
 interface AuditLog {
   id: string
@@ -64,6 +64,19 @@ export default function AuditLogsPage() {
       setStats(data)
     } catch (error) {
       console.error('Failed to fetch stats:', error)
+    }
+  }
+
+  const getActionIcon = (action: string) => {
+    switch (action) {
+      case 'CREATE':
+        return <Plus className="w-4 h-4 text-green-400" />
+      case 'UPDATE':
+        return <Edit className="w-4 h-4 text-blue-400" />
+      case 'DELETE':
+        return <Trash2 className="w-4 h-4 text-red-400" />
+      default:
+        return null
     }
   }
 
@@ -165,13 +178,16 @@ export default function AuditLogsPage() {
               <tbody>
                 {logs.map((log) => (
                   <tr key={log.id} className="border-b border-slate-700 hover:bg-slate-800/50">
-                    <td className="px-6 py-4 text-slate-300">
+                    <td className="px-6 py-4 text-slate-300 text-sm">
                       {new Date(log.timestamp).toLocaleString()}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getActionColor(log.action)}`}>
-                        {log.action}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {getActionIcon(log.action)}
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${getActionColor(log.action)}`}>
+                          {log.action}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-slate-300">
                       {log.resource_type}

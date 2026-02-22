@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search } from 'lucide-react'
+import { Search, Calendar, Tag, Server } from 'lucide-react'
 
 interface Incident {
   id: string
@@ -324,10 +324,16 @@ export default function IncidentsPage() {
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-white mb-2">{incident.title}</h3>
                   <p className="text-slate-400 text-sm mb-4">{incident.description}</p>
-                  <div className="flex items-center gap-2 text-xs text-slate-400">
-                    <span>📅 {new Date(incident.created_at).toLocaleDateString()}</span>
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-slate-400" />
+                      <span>{new Date(incident.created_at).toLocaleDateString()}</span>
+                    </div>
                     <span>•</span>
-                    <span>🏷️ {incident.incident_type}</span>
+                    <div className="flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-slate-400" />
+                      <span>{incident.incident_type}</span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -341,7 +347,10 @@ export default function IncidentsPage() {
               </div>
               {incident.affected_systems && incident.affected_systems.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-slate-700">
-                  <p className="text-xs text-slate-400 mb-2">Affected Systems:</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Server className="w-3 h-3 text-slate-400" />
+                    <p className="text-xs text-slate-400">Affected Systems</p>
+                  </div>
                   <div className="flex gap-2 flex-wrap">
                     {incident.affected_systems.map((system) => (
                       <span key={system} className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-300">

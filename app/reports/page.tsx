@@ -3,10 +3,17 @@
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
-import { Download, RefreshCw } from 'lucide-react'
+import { Download, RefreshCw, BarChart3, AlertCircle, AlertTriangle, FileText, Users } from 'lucide-react'
 
 interface ReportData {
   [key: string]: any
+}
+
+interface Report {
+  id: string
+  title: string
+  description: string
+  icon: React.ReactNode
 }
 
 export default function ReportsPage() {
@@ -14,36 +21,36 @@ export default function ReportsPage() {
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const reports = [
+  const reports: Report[] = [
     {
       id: 'monthly-summary',
       title: 'Monthly Security Summary',
       description: 'Overview of incidents, vulnerabilities, and team activities',
-      icon: '📊',
+      icon: <BarChart3 className="w-8 h-8 text-red-500" />,
     },
     {
       id: 'incident-analysis',
       title: 'Incident Analysis Report',
       description: 'Detailed analysis of incidents by severity, type, and resolution time',
-      icon: '🚨',
+      icon: <AlertCircle className="w-8 h-8 text-red-500" />,
     },
     {
       id: 'vulnerability-status',
       title: 'Vulnerability Status Report',
       description: 'Current state of vulnerabilities including patch coverage and CVE details',
-      icon: '⚠️',
+      icon: <AlertTriangle className="w-8 h-8 text-red-500" />,
     },
     {
       id: 'compliance-audit',
       title: 'Compliance & Audit Log',
       description: 'Complete audit trail for compliance requirements and investigations',
-      icon: '📋',
+      icon: <FileText className="w-8 h-8 text-red-500" />,
     },
     {
       id: 'team-performance',
       title: 'Team Performance Metrics',
       description: 'Team productivity, response times, and resolution metrics',
-      icon: '👥',
+      icon: <Users className="w-8 h-8 text-red-500" />,
     },
   ]
 
@@ -110,7 +117,7 @@ export default function ReportsPage() {
             }`}
           >
             <div className="flex items-start justify-between mb-4">
-              <div className="text-4xl">{report.icon}</div>
+              <div>{report.icon}</div>
               {selectedReport === report.id && (
                 <span className="px-2 py-1 bg-red-600/20 text-red-300 text-xs rounded">
                   Active
