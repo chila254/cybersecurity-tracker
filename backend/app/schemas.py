@@ -228,3 +228,105 @@ class DashboardResponse(BaseModel):
     stats: DashboardStats
     incident_trends: List[IncidentTrend]
     severity_distribution: List[SeverityDistribution]
+
+# ============================================================================
+# Network Monitoring Schemas
+# ============================================================================
+
+class ConnectedDeviceResponse(BaseModel):
+    id: UUID
+    mac_address: str
+    ip_address: Optional[str]
+    device_name: Optional[str]
+    device_type: Optional[str]
+    user_name: Optional[str]
+    manufacturer: Optional[str]
+    connected_at: datetime
+    disconnected_at: Optional[datetime]
+    data_sent_bytes: Optional[str]
+    data_received_bytes: Optional[str]
+    signal_strength: Optional[int]
+    is_online: bool
+    router_model: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class DNSLogResponse(BaseModel):
+    id: UUID
+    mac_address: str
+    domain: str
+    domain_category: Optional[str]
+    query_type: Optional[str]
+    response_code: Optional[str]
+    is_blocked: bool
+    timestamp: datetime
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class SiteCategoryResponse(BaseModel):
+    id: UUID
+    domain: str
+    category: str
+    risk_level: Optional[str]
+    is_blocked: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class WiFiConfigCreate(BaseModel):
+    router_type: str
+    router_url: str
+    router_username: str
+    router_password: str
+    dns_log_source: Optional[str] = None
+    dns_log_url: Optional[str] = None
+    dns_api_key: Optional[str] = None
+
+class WiFiConfigResponse(BaseModel):
+    id: UUID
+    router_type: str
+    router_url: str
+    router_username: str
+    dns_log_source: Optional[str]
+    dns_log_url: Optional[str]
+    is_enabled: bool
+    last_sync_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class NetworkPolicyCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    block_categories: Optional[List[str]] = []
+    allow_categories: Optional[List[str]] = []
+    blocked_domains: Optional[List[str]] = []
+    allowed_domains: Optional[List[str]] = []
+
+class NetworkPolicyResponse(BaseModel):
+    id: UUID
+    name: str
+    description: Optional[str]
+    block_categories: List[str]
+    allow_categories: List[str]
+    blocked_domains: List[str]
+    allowed_domains: List[str]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class NetworkStatsResponse(BaseModel):
+    total_devices: int
+    online_devices: int
+    total_dns_queries: int
+    blocked_queries: int
+    top_domains: List[dict]
+    top_categories: List[dict]
+    device_types: dict

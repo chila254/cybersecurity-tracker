@@ -36,6 +36,7 @@ export function Sidebar() {
         <NavItem href="/dashboard" icon="📊" label="Dashboard" />
         <NavItem href="/incidents" icon="🚨" label="Incidents" />
         <NavItem href="/vulnerabilities" icon="⚠️" label="Vulnerabilities" />
+        <NavItem href="/network" icon="🌐" label="Network Monitor" />
         <NavItem href="/reports" icon="📋" label="Reports" />
         <NavItem href="/settings" icon="⚙️" label="Settings" />
       </nav>

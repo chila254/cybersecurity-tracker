@@ -233,3 +233,92 @@ class Alert(Base):
     organization = relationship("Organization")
     user = relationship("User")
     incident = relationship("Incident")
+
+# ============================================================================
+# Network Monitoring Tables
+# ============================================================================
+
+class ConnectedDevice(Base):
+    __tablename__ = "connected_devices"
+    
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id = Column(PG_UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    mac_address = Column(String(17), nullable=False, index=True)
+    ip_address = Column(String(45), nullable=True, index=True)
+    device_name = Column(String(255), nullable=True)
+    device_type = Column(String(50), nullable=True)  # laptop, phone, tablet, iot
+    user_name = Column(String(255), nullable=True)
+    manufacturer = Column(String(255), nullable=True)
+    connected_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    disconnected_at = Column(DateTime, nullable=True)
+    data_sent_bytes = Column(String(50), nullable=True)
+    data_received_bytes = Column(String(50), nullable=True)
+    signal_strength = Column(Integer, nullable=True)  # -0 to -100 dBm
+    is_online = Column(Boolean, default=True)
+    router_model = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    dns_logs = relationship("DNSLog", back_populates="device")
+
+class DNSLog(Base):
+    __tablename__ = "dns_logs"
+    
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id = Column(PG_UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    device_id = Column(PG_UUID(as_uuid=True), ForeignKey("connected_devices.id", ondelete="CASCADE"), nullable=True)
+    mac_address = Column(String(17), nullable=False, index=True)
+    domain = Column(String(500), nullable=False, index=True)
+    domain_category = Column(String(50), nullable=True)  # social, streaming, work, news, adult, malware, etc
+    query_type = Column(String(10), nullable=True)  # A, AAAA, MX, etc
+    response_code = Column(String(10), nullable=True)  # NOERROR, BLOCKED, etc
+    is_blocked = Column(Boolean, default=False)
+    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    device = relationship("ConnectedDevice", back_populates="dns_logs")
+
+class SiteCategory(Base):
+    __tablename__ = "site_categories"
+    
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    domain = Column(String(500), nullable=False, unique=True, index=True)
+    category = Column(String(50), nullable=False)  # social, streaming, work, news, adult, malware
+    risk_level = Column(String(20), nullable=True)  # low, medium, high
+    is_blocked = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class WiFiConfig(Base):
+    __tablename__ = "wifi_configs"
+    
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id = Column(PG_UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, unique=True)
+    router_type = Column(String(50), nullable=False)  # unifi, meraki, tp_link, mikrotik, etc
+    router_url = Column(String(500), nullable=False)
+    router_username = Column(String(255), nullable=False)
+    router_password = Column(String(500), nullable=False)  # encrypted in production
+    dns_log_source = Column(String(50), nullable=True)  # cloudflare, quad9, local, etc
+    dns_log_url = Column(String(500), nullable=True)
+    dns_api_key = Column(String(500), nullable=True)  # encrypted in production
+    is_enabled = Column(Boolean, default=True)
+    last_sync_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class NetworkPolicy(Base):
+    __tablename__ = "network_policies"
+    
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id = Column(PG_UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    block_categories = Column(ARRAY(String), default=[])  # adult, malware, gambling, etc
+    allow_categories = Column(ARRAY(String), default=[])
+    blocked_domains = Column(ARRAY(String), default=[])
+    allowed_domains = Column(ARRAY(String), default=[])
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
