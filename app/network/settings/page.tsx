@@ -512,6 +512,81 @@ export default function NetworkSettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Network Monitoring Options */}
+      <Card>
+        <CardHeader>
+          <CardTitle>⚙️ Network Monitoring Options</CardTitle>
+          <CardDescription>Configure advanced network monitoring settings</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded border border-slate-200 p-4">
+              <h4 className="font-semibold mb-2">Device Discovery</h4>
+              <p className="text-sm text-gray-600 mb-3">Automatically discover connected devices</p>
+              <Button variant="outline" size="sm" className="w-full">
+                Configure
+              </Button>
+            </div>
+
+            <div className="rounded border border-slate-200 p-4">
+              <h4 className="font-semibold mb-2">DNS Logging</h4>
+              <p className="text-sm text-gray-600 mb-3">Track domain/website access</p>
+              <Button variant="outline" size="sm" className="w-full">
+                Configure
+              </Button>
+            </div>
+
+            <div className="rounded border border-slate-200 p-4">
+              <h4 className="font-semibold mb-2">Real-time Alerts</h4>
+              <p className="text-sm text-gray-600 mb-3">Get notified of suspicious activity</p>
+              <Button variant="outline" size="sm" className="w-full">
+                Configure
+              </Button>
+            </div>
+
+            <div className="rounded border border-slate-200 p-4">
+              <h4 className="font-semibold mb-2">Bandwidth Usage</h4>
+              <p className="text-sm text-gray-600 mb-3">Monitor data consumption per device</p>
+              <Button variant="outline" size="sm" className="w-full">
+                Configure
+              </Button>
+            </div>
+
+            <div className="rounded border border-slate-200 p-4">
+              <h4 className="font-semibold mb-2">Content Filtering</h4>
+              <p className="text-sm text-gray-600 mb-3">Block unwanted content categories</p>
+              <Button variant="outline" size="sm" className="w-full">
+                Configure
+              </Button>
+            </div>
+
+            <div className="rounded border border-slate-200 p-4">
+              <h4 className="font-semibold mb-2">Data Retention</h4>
+              <p className="text-sm text-gray-600 mb-3">Set log retention policies</p>
+              <Button variant="outline" size="sm" className="w-full">
+                Configure
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tips */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardHeader>
+          <CardTitle>💡 Tips & Best Practices</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p>✅ Auto-detection works best on the same network as your router</p>
+          <p>✅ Default admin password is usually 'admin' or on your router label</p>
+          <p>✅ Once connected, click "Sync Now" to discover connected devices</p>
+          <p>✅ Create policies to block unwanted content categories</p>
+          <p>✅ DNS logs show websites visited by users on your network</p>
+          <p>✅ Configure retention policies to manage storage and privacy</p>
+          <p>✅ Device discovery runs on a schedule (check sync status)</p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

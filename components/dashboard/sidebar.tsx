@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
+import { BarChart3, AlertTriangle, Shield, Wifi, FileText, Settings, LogOut, Lock } from 'lucide-react'
 
 export function Sidebar() {
   const router = useRouter()
@@ -33,12 +34,12 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-6 space-y-2">
-        <NavItem href="/dashboard" icon="📊" label="Dashboard" />
-        <NavItem href="/incidents" icon="🚨" label="Incidents" />
-        <NavItem href="/vulnerabilities" icon="⚠️" label="Vulnerabilities" />
-        <NavItem href="/network" icon="🌐" label="Network Monitor" />
-        <NavItem href="/reports" icon="📋" label="Reports" />
-        <NavItem href="/settings" icon="⚙️" label="Settings" />
+        <NavItem href="/dashboard" icon={<BarChart3 className="w-4 h-4" />} label="Dashboard" />
+        <NavItem href="/incidents" icon={<AlertTriangle className="w-4 h-4" />} label="Incidents" />
+        <NavItem href="/vulnerabilities" icon={<Shield className="w-4 h-4" />} label="Vulnerabilities" />
+        <NavItem href="/network" icon={<Wifi className="w-4 h-4" />} label="Network Monitor" />
+        <NavItem href="/reports" icon={<FileText className="w-4 h-4" />} label="Reports" />
+        <NavItem href="/settings" icon={<Settings className="w-4 h-4" />} label="Settings" />
       </nav>
 
       {/* User Info & Logout */}
@@ -46,17 +47,33 @@ export function Sidebar() {
         <div className="mb-4 pb-4 border-b border-slate-700">
           <p className="text-xs text-slate-400">Logged in as</p>
           <p className="text-sm font-medium text-white truncate">{user?.email}</p>
-          <p className="text-xs text-slate-400">
-            {user?.role === 'ADMIN' && '🔴 Administrator'}
-            {user?.role === 'ANALYST' && '🟡 Security Analyst'}
-            {user?.role === 'VIEWER' && '🔵 Viewer'}
-          </p>
+          <div className="flex items-center gap-1 mt-1">
+            {user?.role === 'ADMIN' && (
+              <>
+                <Lock className="w-3 h-3 text-red-500" />
+                <span className="text-xs text-red-400">Administrator</span>
+              </>
+            )}
+            {user?.role === 'ANALYST' && (
+              <>
+                <Shield className="w-3 h-3 text-yellow-500" />
+                <span className="text-xs text-yellow-400">Security Analyst</span>
+              </>
+            )}
+            {user?.role === 'VIEWER' && (
+              <>
+                <FileText className="w-3 h-3 text-blue-500" />
+                <span className="text-xs text-blue-400">Viewer</span>
+              </>
+            )}
+          </div>
         </div>
         <Button
           onClick={handleLogout}
           variant="outline"
-          className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
+          className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-center gap-2"
         >
+          <LogOut className="w-4 h-4" />
           Logout
         </Button>
       </div>
@@ -70,7 +87,7 @@ function NavItem({
   label,
 }: {
   href: string
-  icon: string
+  icon: React.ReactNode
   label: string
 }) {
   return (
@@ -78,7 +95,7 @@ function NavItem({
       href={href}
       className="flex items-center gap-3 px-4 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
     >
-      <span>{icon}</span>
+      {icon}
       <span className="text-sm font-medium">{label}</span>
     </Link>
   )

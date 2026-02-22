@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api-client'
 import { StatsCard } from '@/components/dashboard/stats-card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { AlertTriangle, Clock, AlertCircle, Shield, CheckCircle, TrendingUp } from 'lucide-react'
 
 interface DashboardData {
   stats: {
@@ -107,47 +108,73 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <StatsCard
-          title="Total Incidents"
-          value={data?.stats.total_incidents || 0}
-          icon="🚨"
-          bgColor="bg-red-900/20"
-        />
-        <StatsCard
-          title="Open Incidents"
-          value={data?.stats.open_incidents || 0}
-          icon="⏱️"
-          trend={{
-            value: data?.stats.incidents_this_month || 0,
-            label: 'this month',
-            positive: false,
-          }}
-          bgColor="bg-orange-900/20"
-        />
-        <StatsCard
-          title="Critical Issues"
-          value={data?.stats.critical_severity || 0}
-          icon="🔴"
-          bgColor="bg-red-900/20"
-        />
-        <StatsCard
-          title="Total Vulnerabilities"
-          value={data?.stats.total_vulnerabilities || 0}
-          icon="⚠️"
-          bgColor="bg-yellow-900/20"
-        />
-        <StatsCard
-          title="Unpatched Vulns"
-          value={data?.stats.unpatched_vulnerabilities || 0}
-          icon="🛡️"
-          bgColor="bg-orange-900/20"
-        />
-        <StatsCard
-          title="Patch Coverage"
-          value={`${data?.stats.total_vulnerabilities ? Math.round(((data.stats.total_vulnerabilities - (data.stats.unpatched_vulnerabilities || 0)) / data.stats.total_vulnerabilities) * 100) : 0}%`}
-          icon="✅"
-          bgColor="bg-green-900/20"
-        />
+        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-sm font-medium">Total Incidents</span>
+            <AlertTriangle className="w-5 h-5 text-red-400" />
+          </div>
+          <p className="text-3xl font-bold text-white">{data?.stats.total_incidents || 0}</p>
+        </div>
+
+        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-sm font-medium">Open Incidents</span>
+            <Clock className="w-5 h-5 text-orange-400" />
+          </div>
+          <p className="text-3xl font-bold text-white">{data?.stats.open_incidents || 0}</p>
+          <p className="text-xs text-orange-400 mt-2">{data?.stats.incidents_this_month || 0} this month</p>
+        </div>
+
+        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-sm font-medium">Critical Issues</span>
+            <AlertCircle className="w-5 h-5 text-red-500" />
+          </div>
+          <p className="text-3xl font-bold text-white">{data?.stats.critical_severity || 0}</p>
+        </div>
+
+        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-sm font-medium">Total Vulnerabilities</span>
+            <Shield className="w-5 h-5 text-yellow-400" />
+          </div>
+          <p className="text-3xl font-bold text-white">{data?.stats.total_vulnerabilities || 0}</p>
+        </div>
+
+        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-sm font-medium">Unpatched Vulns</span>
+            <TrendingUp className="w-5 h-5 text-orange-400" />
+          </div>
+          <p className="text-3xl font-bold text-white">{data?.stats.unpatched_vulnerabilities || 0}</p>
+        </div>
+
+        <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-sm font-medium">Patch Coverage</span>
+            <CheckCircle className="w-5 h-5 text-green-400" />
+          </div>
+          <div className="flex items-end gap-2">
+            <p className="text-3xl font-bold text-green-400">
+              {data?.stats.total_vulnerabilities
+                ? Math.round(
+                    ((data.stats.total_vulnerabilities - (data.stats.unpatched_vulnerabilities || 0)) /
+                      data.stats.total_vulnerabilities) *
+                      100
+                  )
+                : 0}
+              %
+            </p>
+          </div>
+          <div className="w-full bg-slate-700 rounded-full h-2 mt-3">
+            <div
+              className="bg-green-500 h-2 rounded-full"
+              style={{
+                width: `${data?.stats.total_vulnerabilities ? Math.round(((data.stats.total_vulnerabilities - (data.stats.unpatched_vulnerabilities || 0)) / data.stats.total_vulnerabilities) * 100) : 0}%`
+              }}
+            ></div>
+          </div>
+        </div>
       </div>
 
       {/* Recent Incidents */}
