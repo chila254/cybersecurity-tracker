@@ -5,7 +5,8 @@ CVE tracking, vulnerability scans, patch management
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, ilike
+from sqlalchemy import and_, or_
+from sqlalchemy.sql import func
 from app.database import get_db
 from app.models import Vulnerability, AuditLog, Incident, User, NotificationPreference
 from app.schemas import (
@@ -39,13 +40,14 @@ async def list_vulnerabilities(
     """
     query = db.query(Vulnerability).filter(Vulnerability.org_id == current_user["org_id"])
     
-    # Text search
+    # Text search (case-insensitive)
     if search:
+        search_term = f"%{search}%"
         query = query.filter(
             or_(
-                ilike(Vulnerability.cve_id, f"%{search}%"),
-                ilike(Vulnerability.title, f"%{search}%"),
-                ilike(Vulnerability.description, f"%{search}%")
+                func.lower(Vulnerability.cve_id).ilike(search_term),
+                func.lower(Vulnerability.title).ilike(search_term),
+                func.lower(Vulnerability.description).ilike(search_term)
             )
         )
     

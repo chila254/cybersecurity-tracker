@@ -5,7 +5,8 @@ CRUD operations for security incidents
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, ilike
+from sqlalchemy import and_, or_
+from sqlalchemy.sql import func
 from app.database import get_db
 from app.models import Incident, Comment, AuditLog, User, NotificationPreference
 from app.schemas import (
@@ -40,12 +41,13 @@ async def list_incidents(
     """
     query = db.query(Incident).filter(Incident.org_id == current_user["org_id"])
     
-    # Text search
+    # Text search (case-insensitive)
     if search:
+        search_term = f"%{search}%"
         query = query.filter(
             or_(
-                ilike(Incident.title, f"%{search}%"),
-                ilike(Incident.description, f"%{search}%")
+                func.lower(Incident.title).ilike(search_term),
+                func.lower(Incident.description).ilike(search_term)
             )
         )
     
