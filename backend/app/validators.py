@@ -2,23 +2,8 @@
 Input validation utilities and custom validators
 """
 
-from pydantic import validator, field_validator, BaseModel
 from typing import Optional, List
 import re
-
-
-class BaseValidator(BaseModel):
-    """Base validator with common validation rules"""
-    
-    class Config:
-        str_strip_whitespace = True
-    
-    @field_validator('*', mode='before')
-    def empty_str_to_none(cls, v):
-        """Convert empty strings to None"""
-        if isinstance(v, str) and v == '':
-            return None
-        return v
 
 
 def validate_email(email: str) -> bool:
