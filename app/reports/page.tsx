@@ -1,10 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { apiClient } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
+import { Download, RefreshCw } from 'lucide-react'
+
+interface ReportData {
+  [key: string]: any
+}
 
 export default function ReportsPage() {
-  const [selectedReport, setSelectedReport] = useState<string | null>(null)
+  const [selectedReport, setSelectedReport] = useState<string>('monthly-summary')
+  const [reportData, setReportData] = useState<ReportData | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const reports = [
     {
@@ -20,7 +28,7 @@ export default function ReportsPage() {
       icon: '🚨',
     },
     {
-      id: 'vuln-status',
+      id: 'vulnerability-status',
       title: 'Vulnerability Status Report',
       description: 'Current state of vulnerabilities including patch coverage and CVE details',
       icon: '⚠️',
@@ -37,21 +45,48 @@ export default function ReportsPage() {
       description: 'Team productivity, response times, and resolution metrics',
       icon: '👥',
     },
-    {
-      id: 'trending-threats',
-      title: 'Trending Threats Analysis',
-      description: 'Analysis of trending incidents and vulnerabilities affecting your organization',
-      icon: '📈',
-    },
   ]
 
-  const handleGenerateReport = (reportId: string) => {
-    setSelectedReport(reportId)
-    // In production, this would trigger report generation and download
-    setTimeout(() => {
-      alert(`Report "${reportId}" would be generated and downloaded as PDF`)
-      setSelectedReport(null)
-    }, 1000)
+  useEffect(() => {
+    fetchReport(selectedReport)
+  }, [selectedReport])
+
+  const fetchReport = async (reportId: string) => {
+    setLoading(true)
+    try {
+      let endpoint = `/reports/${reportId}`
+      const { data } = await apiClient.get(endpoint)
+      setReportData(data)
+    } catch (error) {
+      console.error('Failed to fetch report:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleExportCSV = async (reportId: string) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/reports/${reportId}/export/csv`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      )
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${reportId}-${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+      }
+    } catch (error) {
+      console.error('Failed to export report:', error)
+    }
   }
 
   return (
@@ -63,21 +98,24 @@ export default function ReportsPage() {
       </div>
 
       {/* Reports Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {reports.map((report) => (
           <div
             key={report.id}
-            className="bg-slate-900 rounded-lg p-6 border border-slate-700 hover:border-slate-600 transition-colors"
+            onClick={() => setSelectedReport(report.id)}
+            className={`bg-slate-900 rounded-lg p-6 border transition-colors cursor-pointer ${
+              selectedReport === report.id
+                ? 'border-red-600'
+                : 'border-slate-700 hover:border-slate-600'
+            }`}
           >
             <div className="flex items-start justify-between mb-4">
               <div className="text-4xl">{report.icon}</div>
-              <Button
-                onClick={() => handleGenerateReport(report.id)}
-                disabled={selectedReport === report.id}
-                className="bg-red-600 hover:bg-red-700 text-white text-sm"
-              >
-                {selectedReport === report.id ? 'Generating...' : 'Generate'}
-              </Button>
+              {selectedReport === report.id && (
+                <span className="px-2 py-1 bg-red-600/20 text-red-300 text-xs rounded">
+                  Active
+                </span>
+              )}
             </div>
             <h3 className="text-lg font-bold text-white mb-2">{report.title}</h3>
             <p className="text-slate-400 text-sm">{report.description}</p>
@@ -85,22 +123,44 @@ export default function ReportsPage() {
         ))}
       </div>
 
-      {/* Export Options */}
-      <div className="mt-12 bg-slate-900 rounded-lg p-6 border border-slate-700">
-        <h2 className="text-xl font-bold text-white mb-4">Export Options</h2>
-        <p className="text-slate-400 mb-6">Export raw data for external analysis and auditing</p>
-        <div className="flex gap-4 flex-wrap">
-          <Button className="bg-slate-700 hover:bg-slate-600 text-white">
-            Export as CSV
-          </Button>
-          <Button className="bg-slate-700 hover:bg-slate-600 text-white">
-            Export as JSON
-          </Button>
-          <Button className="bg-slate-700 hover:bg-slate-600 text-white">
-            Export Audit Log
-          </Button>
+      {/* Report Data Display */}
+      {reportData && (
+        <div className="bg-slate-900 rounded-lg p-6 border border-slate-700 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white">
+              {reports.find(r => r.id === selectedReport)?.title}
+            </h2>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => fetchReport(selectedReport)}
+                className="bg-slate-700 hover:bg-slate-600 text-white"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button
+                onClick={() => handleExportCSV(selectedReport)}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-slate-400">Loading report data...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <pre className="bg-slate-800 p-4 rounded text-sm text-slate-300 overflow-auto max-h-96">
+                {JSON.stringify(reportData, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   )
 }

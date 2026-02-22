@@ -14,6 +14,7 @@ from app.schemas import (
 )
 from app.auth import get_current_user
 from app.services import email_service, WebhookService
+from app.validators import validate_string_field, validate_severity, validate_status
 from uuid import UUID
 from datetime import datetime
 import asyncio
@@ -104,6 +105,25 @@ async def create_incident(
     Create a new security incident
     Sends notifications and webhooks to configured services
     """
+    # Input validation
+    if not validate_string_field(incident_data.title, min_length=5, max_length=500):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Title must be 5-500 characters and contain no SQL injection"
+        )
+    
+    if not validate_string_field(incident_data.description, min_length=10, max_length=5000):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Description must be 10-5000 characters"
+        )
+    
+    if not validate_severity(incident_data.severity):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid severity level"
+        )
+    
     try:
         incident = Incident(
             org_id=current_user["org_id"],

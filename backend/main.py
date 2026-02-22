@@ -37,7 +37,7 @@ except Exception as e:
 # Import Routers
 # ============================================================================
 
-from app.routes import auth, incidents, vulnerabilities, dashboard, alerts, integrations
+from app.routes import auth, incidents, vulnerabilities, dashboard, alerts, integrations, reports, audit_logs
 
 # ============================================================================
 # FastAPI Lifespan
@@ -144,6 +144,8 @@ app.include_router(vulnerabilities.router, prefix="/api/vulnerabilities")
 app.include_router(dashboard.router, prefix="/api/dashboard")
 app.include_router(alerts.router, prefix="/api/alerts")
 app.include_router(integrations.router, prefix="/api/integrations")
+app.include_router(reports.router, prefix="/api")
+app.include_router(audit_logs.router, prefix="/api")
 
 # ============================================================================
 # Run app
