@@ -3,7 +3,7 @@ SQLAlchemy ORM models for database tables
 Maps Python classes to database schema
 """
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, ARRAY, Numeric, Enum as SQLEnum, JSON, TIMESTAMP, func
+from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, ARRAY, Numeric, Enum as SQLEnum, JSON, TIMESTAMP, func, Integer
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 from app.database import Base
