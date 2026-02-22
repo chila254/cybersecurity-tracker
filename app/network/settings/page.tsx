@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Settings, Check } from 'lucide-react';
+import { AlertCircle, Settings, Check, Loader } from 'lucide-react';
 
 interface WiFiConfig {
   router_type: string;
@@ -21,13 +21,6 @@ interface NetworkPolicy {
   is_active: boolean;
 }
 
-const ROUTER_TYPES = [
-  { value: 'unifi', label: 'Ubiquiti UniFi' },
-  { value: 'meraki', label: 'Cisco Meraki' },
-  { value: 'tp_link', label: 'TP-Link' },
-  { value: 'mikrotik', label: 'Mikrotik RouterOS' }
-];
-
 const DOMAIN_CATEGORIES = [
   { value: 'social', label: '🔵 Social Media' },
   { value: 'streaming', label: '🎬 Video Streaming' },
@@ -41,17 +34,13 @@ export default function NetworkSettingsPage() {
   const [policies, setPolicies] = useState<NetworkPolicy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showConfigForm, setShowConfigForm] = useState(false);
+  const [step, setStep] = useState<'detect' | 'configure' | 'done'>('detect');
 
-  const [formData, setFormData] = useState({
-    router_type: 'unifi',
-    router_url: '',
-    router_username: '',
-    router_password: '',
-    dns_log_source: '',
-    dns_log_url: '',
-    dns_api_key: ''
-  });
+  const [detecting, setDetecting] = useState(false);
+  const [detectionResult, setDetectionResult] = useState<any>(null);
+
+  const [password, setPassword] = useState('');
+  const [testingConnection, setTestingConnection] = useState(false);
 
   const [policyForm, setPolicyForm] = useState({
     name: '',
@@ -75,6 +64,9 @@ export default function NetworkSettingsPage() {
 
       if (res.ok) {
         setConfig(await res.json());
+        setStep('done');
+      } else {
+        setStep('detect');
       }
 
       const policiesRes = await fetch(`${apiUrl}/network/policies`, {
@@ -91,26 +83,80 @@ export default function NetworkSettingsPage() {
     }
   };
 
-  const handleSaveConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleDetectRouter = async () => {
+    try {
+      setDetecting(true);
+      setDetectionResult(null);
+      
+      const res = await fetch(`${apiUrl}/network/wifi-config/detect`, {
+        method: 'POST'
+      });
+
+      const result = await res.json();
+      setDetectionResult(result);
+
+      if (result.detected) {
+        setStep('configure');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Detection failed');
+    } finally {
+      setDetecting(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!password) {
+      alert('Please enter your router password');
+      return;
+    }
 
     try {
-      const res = await fetch(`${apiUrl}/network/wifi-config`, {
+      setTestingConnection(true);
+
+      const res = await fetch(`${apiUrl}/network/wifi-config/test-connection`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          router_url: detectionResult.router_url,
+          password: password,
+          router_type: detectionResult.router_type
+        })
       });
 
-      if (!res.ok) throw new Error('Failed to save configuration');
+      const result = await res.json();
 
-      alert('WiFi configuration saved successfully');
-      setShowConfigForm(false);
-      fetchSettings();
+      if (result.success) {
+        // Save configuration
+        const saveRes = await fetch(`${apiUrl}/network/wifi-config`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            router_type: detectionResult.router_type,
+            router_url: detectionResult.router_url,
+            router_username: 'admin',
+            router_password: password
+          })
+        });
+
+        if (saveRes.ok) {
+          setConfig(await saveRes.json());
+          setStep('done');
+          alert('✅ Router configured successfully!');
+        }
+      } else {
+        alert('❌ Connection failed: ' + (result.message || result.error));
+      }
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save');
+      alert('Error: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setTestingConnection(false);
     }
   };
 
@@ -129,11 +175,11 @@ export default function NetworkSettingsPage() {
 
       if (!res.ok) throw new Error('Failed to create policy');
 
-      alert('Policy created successfully');
+      alert('✅ Policy created successfully');
       setPolicyForm({ name: '', description: '', block_categories: [] });
       fetchSettings();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to create policy');
+      alert('❌ Error: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
 
@@ -147,7 +193,7 @@ export default function NetworkSettingsPage() {
           <Settings className="h-8 w-8" />
           Network Settings
         </h1>
-        <p className="text-gray-600">Configure WiFi router and network policies</p>
+        <p className="text-gray-600">Auto-detect and configure your WiFi router</p>
       </div>
 
       {error && (
@@ -159,127 +205,153 @@ export default function NetworkSettingsPage() {
         </Card>
       )}
 
-      {/* WiFi Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle>WiFi Router Configuration</CardTitle>
-          <CardDescription>Connect your WiFi router to track connected devices</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {config ? (
-            <div className="space-y-3 rounded bg-green-50 p-4">
-              <div className="flex items-center gap-2 text-green-800">
-                <Check className="h-5 w-5" />
-                <span className="font-semibold">Router Connected</span>
-              </div>
-              <div className="space-y-2 text-sm">
-                <p>
-                  <span className="font-semibold">Type:</span> {config.router_type}
-                </p>
-                <p>
-                  <span className="font-semibold">URL:</span> {config.router_url}
-                </p>
-                {config.dns_log_source && (
-                  <p>
-                    <span className="font-semibold">DNS Source:</span> {config.dns_log_source}
+      {/* Step 1: Auto-Detect */}
+      {step === 'detect' && !config && (
+        <Card>
+          <CardHeader>
+            <CardTitle>🔍 Auto-Detect Router</CardTitle>
+            <CardDescription>Let us find your WiFi router automatically</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {detectionResult ? (
+              detectionResult.detected ? (
+                <div className="space-y-3 rounded bg-green-50 p-4">
+                  <div className="flex items-center gap-2 text-green-800">
+                    <Check className="h-5 w-5" />
+                    <span className="font-semibold">Router Detected!</span>
+                  </div>
+                  <p className="text-sm">
+                    <span className="font-semibold">Type:</span> {detectionResult.router_type.toUpperCase()}
                   </p>
+                  <p className="text-sm">
+                    <span className="font-semibold">URL:</span> {detectionResult.router_url}
+                  </p>
+                  <p className="text-xs text-green-700">{detectionResult.message}</p>
+                  <Button onClick={() => setStep('configure')}>Continue to Login</Button>
+                </div>
+              ) : (
+                <div className="space-y-3 rounded bg-yellow-50 p-4">
+                  <p className="text-sm text-yellow-800">{detectionResult.message}</p>
+                  {detectionResult.suggestions && (
+                    <ul className="list-inside list-disc space-y-1 text-xs text-yellow-700">
+                      {detectionResult.suggestions.map((s: string, i: number) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleDetectRouter}>
+                    Try Again
+                  </Button>
+                </div>
+              )
+            ) : (
+              <Button
+                onClick={handleDetectRouter}
+                disabled={detecting}
+                className="w-full"
+                size="lg"
+              >
+                {detecting ? (
+                  <>
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    Scanning Network...
+                  </>
+                ) : (
+                  '🔍 Detect My Router'
                 )}
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setShowConfigForm(true)}>
-                Edit Configuration
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 2: Configure (Enter Password) */}
+      {step === 'configure' && detectionResult?.detected && (
+        <Card>
+          <CardHeader>
+            <CardTitle>🔐 Router Login</CardTitle>
+            <CardDescription>
+              Detected: {detectionResult.router_type.toUpperCase()} at {detectionResult.router_url}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium">Router Admin Password</label>
+              <input
+                type="password"
+                placeholder="Enter your router admin password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="mt-1 block w-full rounded border px-3 py-2"
+                onKeyPress={e => e.key === 'Enter' && handleTestConnection()}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Usually 'admin' or found on the router label
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleTestConnection}
+                disabled={testingConnection || !password}
+                className="flex-1"
+              >
+                {testingConnection ? (
+                  <>
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  '🔗 Connect & Save'
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setStep('detect')}
+              >
+                Back
               </Button>
             </div>
-          ) : (
-            <Button onClick={() => setShowConfigForm(true)}>Add WiFi Configuration</Button>
-          )}
+          </CardContent>
+        </Card>
+      )}
 
-          {showConfigForm && (
-            <form onSubmit={handleSaveConfig} className="space-y-4 border-t pt-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium">Router Type *</label>
-                  <select
-                    value={formData.router_type}
-                    onChange={e => setFormData({ ...formData, router_type: e.target.value })}
-                    className="mt-1 block w-full rounded border px-3 py-2"
-                    required
-                  >
-                    {ROUTER_TYPES.map(rt => (
-                      <option key={rt.value} value={rt.value}>
-                        {rt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium">Router URL *</label>
-                  <input
-                    type="text"
-                    placeholder="https://192.168.1.1"
-                    value={formData.router_url}
-                    onChange={e => setFormData({ ...formData, router_url: e.target.value })}
-                    className="mt-1 block w-full rounded border px-3 py-2"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium">Username *</label>
-                  <input
-                    type="text"
-                    value={formData.router_username}
-                    onChange={e => setFormData({ ...formData, router_username: e.target.value })}
-                    className="mt-1 block w-full rounded border px-3 py-2"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium">Password *</label>
-                  <input
-                    type="password"
-                    value={formData.router_password}
-                    onChange={e => setFormData({ ...formData, router_password: e.target.value })}
-                    className="mt-1 block w-full rounded border px-3 py-2"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium">DNS Log Source</label>
-                  <select
-                    value={formData.dns_log_source}
-                    onChange={e => setFormData({ ...formData, dns_log_source: e.target.value })}
-                    className="mt-1 block w-full rounded border px-3 py-2"
-                  >
-                    <option value="">None</option>
-                    <option value="cloudflare">Cloudflare</option>
-                    <option value="quad9">Quad9</option>
-                    <option value="local">Local Router</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button type="submit">Save Configuration</Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowConfigForm(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+      {/* Step 3: Done / Configured */}
+      {step === 'done' && config && (
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-800">
+              <Check className="h-5 w-5" />
+              ✅ Router Connected
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <p>
+              <span className="font-semibold">Router Type:</span> {config.router_type.toUpperCase()}
+            </p>
+            <p>
+              <span className="font-semibold">URL:</span> {config.router_url}
+            </p>
+            {config.is_enabled && <p className="text-green-800">✅ Enabled and ready to sync</p>}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPassword('');
+                setDetectionResult(null);
+                setStep('detect');
+              }}
+              size="sm"
+            >
+              Change Router
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Network Policies */}
       <Card>
         <CardHeader>
-          <CardTitle>Network Policies</CardTitle>
+          <CardTitle>🚫 Network Policies</CardTitle>
           <CardDescription>Block categories of websites</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -305,13 +377,6 @@ export default function NetworkSettingsPage() {
                         ))}
                       </div>
                     </div>
-                    <span className={`rounded px-2 py-1 text-xs font-semibold ${
-                      policy.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {policy.is_active ? 'Active' : 'Inactive'}
-                    </span>
                   </div>
                 </div>
               ))}
@@ -380,24 +445,16 @@ export default function NetworkSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Configuration Guide */}
+      {/* Tips */}
       <Card className="border-blue-200 bg-blue-50">
         <CardHeader>
-          <CardTitle>📖 Configuration Guide</CardTitle>
+          <CardTitle>💡 Tips</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div>
-            <h4 className="font-semibold">UniFi Setup</h4>
-            <p>Enable SSH access and use the UniFi controller IP address</p>
-          </div>
-          <div>
-            <h4 className="font-semibold">Meraki Setup</h4>
-            <p>Generate an API key from your Meraki dashboard and use it as the password</p>
-          </div>
-          <div>
-            <h4 className="font-semibold">Data Privacy Notice</h4>
-            <p>⚠️ This feature requires employee consent. Ensure you have proper policies in place.</p>
-          </div>
+        <CardContent className="space-y-2 text-sm">
+          <p>✅ Auto-detection works best on the same network as your router</p>
+          <p>✅ Default admin password is usually 'admin' or on your router label</p>
+          <p>✅ Once connected, click "Sync Now" to discover connected devices</p>
+          <p>✅ Create policies to block unwanted content categories</p>
         </CardContent>
       </Card>
     </div>

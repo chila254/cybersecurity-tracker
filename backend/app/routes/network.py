@@ -19,8 +19,53 @@ from app.schemas import (
 )
 from app.services.wifi_service import WiFiService
 from app.services.dns_service import DNSService
+from app.services.router_detection_service import RouterDetectionService
 
 router = APIRouter(prefix="/network", tags=["Network Monitoring"])
+
+# ============================================================================
+# Router Auto-Detection
+# ============================================================================
+
+@router.post("/wifi-config/detect")
+async def detect_router():
+    """
+    Auto-detect router type and URL
+    No authentication required (local network scan)
+    """
+    try:
+        result = await RouterDetectionService.detect_router()
+        return result
+    except Exception as e:
+        return {
+            "detected": False,
+            "error": str(e),
+            "message": "Router detection failed"
+        }
+
+@router.post("/wifi-config/test-connection")
+async def test_router_connection(
+    router_url: str,
+    password: str,
+    router_type: str = "tenda",
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Test if router connection works with provided credentials
+    """
+    try:
+        result = await RouterDetectionService.test_connection(
+            router_url=router_url,
+            password=password,
+            router_type=router_type
+        )
+        return result
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 # ============================================================================
 # WiFi Configuration
