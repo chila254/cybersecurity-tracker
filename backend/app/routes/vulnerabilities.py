@@ -5,26 +5,29 @@ CVE tracking, vulnerability scans, patch management
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_, ilike
 from app.database import get_db
-from app.models import Vulnerability, AuditLog, Incident
+from app.models import Vulnerability, AuditLog, Incident, User, NotificationPreference
 from app.schemas import (
     VulnerabilityCreate, VulnerabilityUpdate, VulnerabilityResponse
 )
 from app.auth import get_current_user
+from app.services import email_service, WebhookService
 from uuid import UUID
 from datetime import datetime
+import asyncio
 
 router = APIRouter(prefix="/vulnerabilities", tags=["Vulnerabilities"])
 
 # ============================================================================
-# List Vulnerabilities
+# List Vulnerabilities with Search, Filters & Pagination
 # ============================================================================
 
 @router.get("", response_model=list[VulnerabilityResponse])
 async def list_vulnerabilities(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
+    search: str = Query(None, description="Search by CVE ID, title, or description"),
     status: str = Query(None),
     severity: str = Query(None),
     skip: int = Query(0, ge=0),
@@ -32,10 +35,21 @@ async def list_vulnerabilities(
 ):
     """
     List all vulnerabilities for the organization
-    Supports filtering by status and severity
+    Supports search, filtering by status/severity, and pagination
     """
     query = db.query(Vulnerability).filter(Vulnerability.org_id == current_user["org_id"])
     
+    # Text search
+    if search:
+        query = query.filter(
+            or_(
+                ilike(Vulnerability.cve_id, f"%{search}%"),
+                ilike(Vulnerability.title, f"%{search}%"),
+                ilike(Vulnerability.description, f"%{search}%")
+            )
+        )
+    
+    # Filters
     if status:
         query = query.filter(Vulnerability.status == status)
     if severity:
@@ -85,6 +99,7 @@ async def create_vulnerability(
     """
     Create a new vulnerability record
     Can be from manual entry or automated scans
+    Sends notifications if severity is CRITICAL or HIGH
     """
     # Check for duplicate CVE
     if vuln_data.cve_id:
@@ -129,6 +144,14 @@ async def create_vulnerability(
         db.add(audit)
         db.commit()
         
+        # Send notifications for CRITICAL or HIGH vulnerabilities
+        if vuln_data.severity in ["CRITICAL", "HIGH"]:
+            asyncio.create_task(
+                _send_vulnerability_notifications(
+                    db, vuln, current_user["org_id"]
+                )
+            )
+        
         return vuln
     
     except Exception as e:
@@ -137,6 +160,45 @@ async def create_vulnerability(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+async def _send_vulnerability_notifications(db: Session, vuln: Vulnerability, org_id):
+    """Send email and webhook notifications for critical vulnerability"""
+    try:
+        # Get users with critical vulnerability preferences
+        users_with_prefs = db.query(User, NotificationPreference).join(
+            NotificationPreference
+        ).filter(
+            User.org_id == org_id,
+            NotificationPreference.email_on_critical_vulnerability == True,
+            User.is_active == True
+        ).all()
+        
+        # Send emails to users
+        for user, pref in users_with_prefs:
+            await email_service.send_vulnerability_alert(
+                recipient_email=user.email,
+                cve_id=vuln.cve_id or "Unknown",
+                title=vuln.title,
+                severity=vuln.severity,
+                cvss_score=float(vuln.cvss_score) if vuln.cvss_score else 0,
+                affected_systems=vuln.affected_systems or [],
+                vulnerability_id=str(vuln.id)
+            )
+        
+        # Trigger webhooks
+        await WebhookService.trigger_vulnerability_webhook(
+            org_id=str(org_id),
+            vulnerability_id=str(vuln.id),
+            cve_id=vuln.cve_id or "Unknown",
+            title=vuln.title,
+            severity=vuln.severity,
+            cvss_score=float(vuln.cvss_score) if vuln.cvss_score else 0,
+            affected_systems=vuln.affected_systems or [],
+            db=db
+        )
+    except Exception as e:
+        print(f"Error sending vulnerability notifications: {str(e)}")
 
 # ============================================================================
 # Update Vulnerability

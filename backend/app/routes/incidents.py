@@ -5,41 +5,57 @@ CRUD operations for security incidents
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_, ilike
 from app.database import get_db
-from app.models import Incident, Comment, AuditLog
+from app.models import Incident, Comment, AuditLog, User, NotificationPreference
 from app.schemas import (
     IncidentCreate, IncidentUpdate, IncidentResponse, CommentCreate, CommentResponse
 )
 from app.auth import get_current_user
+from app.services import email_service, WebhookService
 from uuid import UUID
 from datetime import datetime
+import asyncio
 
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
 
 # ============================================================================
-# List Incidents
+# List Incidents with Search, Filters & Pagination
 # ============================================================================
 
 @router.get("", response_model=list[IncidentResponse])
 async def list_incidents(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
+    search: str = Query(None, description="Search by title or description"),
     status: str = Query(None),
     severity: str = Query(None),
+    incident_type: str = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100)
 ):
     """
     List all incidents for the organization
-    Supports filtering by status and severity
+    Supports search, filtering by status/severity/type, and pagination
     """
     query = db.query(Incident).filter(Incident.org_id == current_user["org_id"])
     
+    # Text search
+    if search:
+        query = query.filter(
+            or_(
+                ilike(Incident.title, f"%{search}%"),
+                ilike(Incident.description, f"%{search}%")
+            )
+        )
+    
+    # Filters
     if status:
         query = query.filter(Incident.status == status)
     if severity:
         query = query.filter(Incident.severity == severity)
+    if incident_type:
+        query = query.filter(Incident.incident_type == incident_type)
     
     incidents = query.order_by(Incident.created_at.desc()).offset(skip).limit(limit).all()
     return incidents
@@ -84,6 +100,7 @@ async def create_incident(
 ):
     """
     Create a new security incident
+    Sends notifications and webhooks to configured services
     """
     try:
         incident = Incident(
@@ -112,6 +129,13 @@ async def create_incident(
         db.add(audit)
         db.commit()
         
+        # Send notifications async (non-blocking)
+        asyncio.create_task(
+            _send_incident_notifications(
+                db, incident, current_user["org_id"]
+            )
+        )
+        
         return incident
     
     except Exception as e:
@@ -120,6 +144,43 @@ async def create_incident(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+async def _send_incident_notifications(db: Session, incident: Incident, org_id):
+    """Send email and webhook notifications for new incident"""
+    try:
+        # Get users with notification preferences
+        users_with_prefs = db.query(User, NotificationPreference).join(
+            NotificationPreference
+        ).filter(
+            User.org_id == org_id,
+            NotificationPreference.email_on_new_incident == True,
+            User.is_active == True
+        ).all()
+        
+        # Send emails to users
+        for user, pref in users_with_prefs:
+            await email_service.send_incident_alert(
+                recipient_email=user.email,
+                incident_title=incident.title,
+                severity=incident.severity,
+                description=incident.description,
+                created_at=incident.created_at,
+                incident_id=str(incident.id)
+            )
+        
+        # Trigger webhooks
+        await WebhookService.trigger_incident_webhook(
+            org_id=str(org_id),
+            incident_id=str(incident.id),
+            incident_title=incident.title,
+            severity=incident.severity,
+            description=incident.description,
+            status=incident.status,
+            db=db
+        )
+    except Exception as e:
+        print(f"Error sending incident notifications: {str(e)}")
 
 # ============================================================================
 # Update Incident

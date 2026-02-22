@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Search } from 'lucide-react'
 
 interface Incident {
   id: string
@@ -28,29 +29,51 @@ export default function IncidentsPage() {
     severity: 'MEDIUM',
     incident_type: 'other',
   })
+  
+  // Search and filter
+  const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterSeverity, setFilterSeverity] = useState('')
+  const [filterType, setFilterType] = useState('')
+  
+  // Pagination
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
+  const [totalIncidents, setTotalIncidents] = useState(0)
 
   useEffect(() => {
     fetchIncidents()
-  }, [filterStatus, filterSeverity])
+  }, [search, filterStatus, filterSeverity, filterType, page])
 
   const fetchIncidents = async () => {
     setLoading(true)
     try {
       let url = '/incidents'
       const params = new URLSearchParams()
+      if (search) params.append('search', search)
       if (filterStatus) params.append('status', filterStatus)
       if (filterSeverity) params.append('severity', filterSeverity)
+      if (filterType) params.append('incident_type', filterType)
+      params.append('skip', (page * pageSize).toString())
+      params.append('limit', pageSize.toString())
+      
       if (params.toString()) url += '?' + params.toString()
 
       const { data } = await apiClient.get<Incident[]>(url)
-      if (data) setIncidents(data)
+      if (data) {
+        setIncidents(data)
+        setTotalIncidents(data.length)
+      }
     } catch (error) {
       console.error('Failed to fetch incidents:', error)
     } finally {
       setLoading(false)
     }
+  }
+  
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value)
+    setPage(0) // Reset to first page on new search
   }
 
   const handleCreateIncident = async (e: React.FormEvent) => {
@@ -111,30 +134,68 @@ export default function IncidentsPage() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="bg-slate-900 rounded-lg p-4 mb-6 border border-slate-700 flex gap-4">
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="bg-slate-800 text-white border border-slate-600 rounded px-3 py-2 text-sm"
-        >
-          <option value="">All Status</option>
-          <option value="OPEN">Open</option>
-          <option value="INVESTIGATING">Investigating</option>
-          <option value="RESOLVED">Resolved</option>
-          <option value="CLOSED">Closed</option>
-        </select>
-        <select
-          value={filterSeverity}
-          onChange={(e) => setFilterSeverity(e.target.value)}
-          className="bg-slate-800 text-white border border-slate-600 rounded px-3 py-2 text-sm"
-        >
-          <option value="">All Severity</option>
-          <option value="CRITICAL">Critical</option>
-          <option value="HIGH">High</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="LOW">Low</option>
-        </select>
+      {/* Search & Filters */}
+      <div className="bg-slate-900 rounded-lg p-4 mb-6 border border-slate-700">
+        <div className="flex gap-3 mb-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Search by title or description..."
+              value={search}
+              onChange={handleSearch}
+              className="bg-slate-800 border-slate-600 text-white pl-10"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <select
+            value={filterStatus}
+            onChange={(e) => {
+              setFilterStatus(e.target.value)
+              setPage(0)
+            }}
+            className="bg-slate-800 text-white border border-slate-600 rounded px-3 py-2 text-sm"
+          >
+            <option value="">All Status</option>
+            <option value="OPEN">Open</option>
+            <option value="INVESTIGATING">Investigating</option>
+            <option value="RESOLVED">Resolved</option>
+            <option value="CLOSED">Closed</option>
+          </select>
+          <select
+            value={filterSeverity}
+            onChange={(e) => {
+              setFilterSeverity(e.target.value)
+              setPage(0)
+            }}
+            className="bg-slate-800 text-white border border-slate-600 rounded px-3 py-2 text-sm"
+          >
+            <option value="">All Severity</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+          <select
+            value={filterType}
+            onChange={(e) => {
+              setFilterType(e.target.value)
+              setPage(0)
+            }}
+            className="bg-slate-800 text-white border border-slate-600 rounded px-3 py-2 text-sm"
+          >
+            <option value="">All Types</option>
+            <option value="data_breach">Data Breach</option>
+            <option value="malware">Malware</option>
+            <option value="unauthorized_access">Unauthorized Access</option>
+            <option value="denial_of_service">Denial of Service</option>
+            <option value="social_engineering">Social Engineering</option>
+            <option value="configuration_error">Configuration Error</option>
+            <option value="supply_chain">Supply Chain</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
       </div>
 
       {/* Incidents List */}
@@ -188,6 +249,33 @@ export default function IncidentsPage() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {!loading && incidents.length > 0 && (
+        <div className="flex items-center justify-between mt-6 bg-slate-900 rounded-lg p-4 border border-slate-700">
+          <div className="text-sm text-slate-400">
+            Showing {page * pageSize + 1}-{Math.min((page + 1) * pageSize, totalIncidents)} of {totalIncidents}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setPage(Math.max(0, page - 1))}
+              disabled={page === 0}
+              variant="outline"
+              className="border-slate-600 text-slate-300"
+            >
+              ← Previous
+            </Button>
+            <Button
+              onClick={() => setPage(page + 1)}
+              disabled={incidents.length < pageSize}
+              variant="outline"
+              className="border-slate-600 text-slate-300"
+            >
+              Next →
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Create Modal */}
       {showModal && (

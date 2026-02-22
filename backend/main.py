@@ -11,6 +11,9 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
 from contextlib import asynccontextmanager
 from create_tables import create_tables  # your table-creation function
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # ============================================================================
 # Load environment variables
@@ -52,12 +55,22 @@ async def lifespan(app: FastAPI):
 # Initialize FastAPI app
 # ============================================================================
 
+# Initialize limiter
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="Cybersecurity Incident Tracker API",
     description="Enterprise-grade incident and vulnerability management platform",
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Add rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, lambda req, exc: JSONResponse(
+    status_code=429,
+    content={"error": "Rate limit exceeded", "detail": str(exc)}
+))
 
 # ============================================================================
 # CORS Configuration

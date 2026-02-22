@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Search } from 'lucide-react'
 
 interface Vulnerability {
   id: string
@@ -31,29 +32,49 @@ export default function VulnerabilitiesPage() {
     severity: 'MEDIUM',
     status: 'UNPATCHED',
   })
+  
+  // Search and filter
+  const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterSeverity, setFilterSeverity] = useState('')
+  
+  // Pagination
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
+  const [totalVulns, setTotalVulns] = useState(0)
 
   useEffect(() => {
     fetchVulnerabilities()
-  }, [filterStatus, filterSeverity])
+  }, [search, filterStatus, filterSeverity, page])
 
   const fetchVulnerabilities = async () => {
     setLoading(true)
     try {
       let url = '/vulnerabilities'
       const params = new URLSearchParams()
+      if (search) params.append('search', search)
       if (filterStatus) params.append('status', filterStatus)
       if (filterSeverity) params.append('severity', filterSeverity)
+      params.append('skip', (page * pageSize).toString())
+      params.append('limit', pageSize.toString())
+      
       if (params.toString()) url += '?' + params.toString()
 
       const { data } = await apiClient.get<Vulnerability[]>(url)
-      if (data) setVulnerabilities(data)
+      if (data) {
+        setVulnerabilities(data)
+        setTotalVulns(data.length)
+      }
     } catch (error) {
       console.error('Failed to fetch vulnerabilities:', error)
     } finally {
       setLoading(false)
     }
+  }
+  
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value)
+    setPage(0) // Reset to first page on new search
   }
 
   const handleCreateVulnerability = async (e: React.FormEvent) => {
@@ -130,31 +151,51 @@ export default function VulnerabilitiesPage() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="bg-slate-900 rounded-lg p-4 mb-6 border border-slate-700 flex gap-4">
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="bg-slate-800 text-white border border-slate-600 rounded px-3 py-2 text-sm"
-        >
-          <option value="">All Status</option>
-          <option value="UNPATCHED">Unpatched</option>
-          <option value="PATCHED">Patched</option>
-          <option value="MITIGATED">Mitigated</option>
-          <option value="MONITORING">Monitoring</option>
-        </select>
-        <select
-          value={filterSeverity}
-          onChange={(e) => setFilterSeverity(e.target.value)}
-          className="bg-slate-800 text-white border border-slate-600 rounded px-3 py-2 text-sm"
-        >
-          <option value="">All Severity</option>
-          <option value="CRITICAL">Critical</option>
-          <option value="HIGH">High</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="LOW">Low</option>
-          <option value="INFO">Info</option>
-        </select>
+      {/* Search & Filters */}
+      <div className="bg-slate-900 rounded-lg p-4 mb-6 border border-slate-700">
+        <div className="flex gap-3 mb-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Search by CVE ID, title, or description..."
+              value={search}
+              onChange={handleSearch}
+              className="bg-slate-800 border-slate-600 text-white pl-10"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <select
+            value={filterStatus}
+            onChange={(e) => {
+              setFilterStatus(e.target.value)
+              setPage(0)
+            }}
+            className="bg-slate-800 text-white border border-slate-600 rounded px-3 py-2 text-sm"
+          >
+            <option value="">All Status</option>
+            <option value="UNPATCHED">Unpatched</option>
+            <option value="PATCHED">Patched</option>
+            <option value="MITIGATED">Mitigated</option>
+            <option value="MONITORING">Monitoring</option>
+          </select>
+          <select
+            value={filterSeverity}
+            onChange={(e) => {
+              setFilterSeverity(e.target.value)
+              setPage(0)
+            }}
+            className="bg-slate-800 text-white border border-slate-600 rounded px-3 py-2 text-sm"
+          >
+            <option value="">All Severity</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+            <option value="INFO">Info</option>
+          </select>
+        </div>
       </div>
 
       {/* Vulnerabilities List */}
@@ -227,6 +268,33 @@ export default function VulnerabilitiesPage() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {!loading && vulnerabilities.length > 0 && (
+        <div className="flex items-center justify-between mt-6 bg-slate-900 rounded-lg p-4 border border-slate-700">
+          <div className="text-sm text-slate-400">
+            Showing {page * pageSize + 1}-{Math.min((page + 1) * pageSize, totalVulns)} of {totalVulns}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setPage(Math.max(0, page - 1))}
+              disabled={page === 0}
+              variant="outline"
+              className="border-slate-600 text-slate-300"
+            >
+              ← Previous
+            </Button>
+            <Button
+              onClick={() => setPage(page + 1)}
+              disabled={vulnerabilities.length < pageSize}
+              variant="outline"
+              className="border-slate-600 text-slate-300"
+            >
+              Next →
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Create Modal */}
       {showModal && (
