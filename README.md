@@ -86,39 +86,86 @@ Frontend will be available at `http://localhost:3000`
 ## 📋 Features Implemented
 
 ### Dashboard
-- 📊 Real-time statistics and KPIs
-- 📈 Incident trends (30-day history)
-- 🎯 Severity distribution charts
-- 🔴 Critical vulnerabilities highlighting
+- Real-time statistics with 6 key metrics (incidents, vulnerabilities, patch coverage)
+- Patch coverage progress bar visualization
+- Incident trends (30-day history)
+- Severity distribution analysis
+- Critical vulnerabilities highlighting
+- Professional icon-based design with color coding
 
 ### Incident Management
-- ✅ Full CRUD operations
-- 🏷️ Severity levels (Critical, High, Medium, Low)
-- 📊 Status tracking (Open, Investigating, Resolved, Closed)
-- 👥 Team assignments and collaboration
-- 💬 Comments and timeline
-- 🏢 Multi-tenant isolation
+- Full CRUD operations with search, filter, pagination
+- Severity levels (Critical, High, Medium, Low)
+- Status tracking (Open, Investigating, Resolved, Closed)
+- Team assignments and collaboration
+- Comments and timeline
+- Multi-tenant isolation
 
 ### Vulnerability Management
-- ✅ CVE tracking with CVSS scores
-- 📋 Patch status management
-- 🛠️ Remediation tracking
-- 🔗 Link vulnerabilities to incidents
-- 🔍 Filter by severity and status
+- CVE tracking with CVSS scores
+- Patch status management with coverage tracking
+- Remediation tracking
+- Link vulnerabilities to incidents
+- Filter by severity and status
+- Bulk actions support
+
+### Network Monitoring (NEW)
+- **WiFi Device Tracking**
+  - Auto-detect router (Tenda, TP-Link, UniFi, Meraki, Mikrotik)
+  - List connected devices with MAC/IP addresses
+  - Device type detection (laptop, phone, tablet, IoT)
+  - Connection time and signal strength tracking
+  - Real-time online/offline status
+
+- **DNS Query Logging**
+  - Track websites visited by each device
+  - Auto-categorization (social, streaming, work, news, adult, malware)
+  - Block/allow filtering
+  - DNS query history per user/device
+  - Top domains analytics
+
+- **Network Policies**
+  - Block content categories
+  - Create custom access rules
+  - Enable/disable policies on demand
+
+- **Advanced Monitoring Options**
+  - Device Discovery automation
+  - Real-time alerts for suspicious activity
+  - Bandwidth usage monitoring
+  - Content filtering configuration
+  - Data retention policies
+
+### Email Notifications & Webhooks
+- Email alerts for new incidents and critical vulnerabilities
+- Slack integration with formatted messages
+- Microsoft Teams adaptive cards
+- Webhook management UI
+- Async notification delivery (non-blocking)
+
+### Reports & Analytics
+- PDF report generation
+- Audit logs with full change history
+- User activity tracking
+- Compliance reporting
 
 ### Security Features
-- 🔐 JWT authentication
-- 🔑 Bcrypt password hashing
-- 👤 Role-based access control (ADMIN, ANALYST, VIEWER)
-- 📝 Comprehensive audit logging
-- 🏗️ Multi-tenant with organization isolation
-- 🔒 Row-Level Security policies
+- JWT authentication with token refresh
+- Bcrypt password hashing
+- Role-based access control (ADMIN, ANALYST, VIEWER)
+- Comprehensive audit logging
+- Multi-tenant with organization isolation
+- Row-Level Security policies
+- Rate limiting (100 req/min per IP)
+- SQL injection prevention (parameterized queries)
 
 ### API Features
-- 🔌 RESTful API design
-- 📚 Interactive API documentation
-- 🔄 Full error handling
-- 📊 Request/response validation
+- RESTful API design with 40+ endpoints
+- Interactive API documentation (Swagger)
+- Full error handling
+- Request/response validation
+- Search, filter, pagination support
+- Async operations
 
 ## 🔐 Authentication
 
@@ -146,7 +193,7 @@ Frontend will be available at `http://localhost:3000`
 - `GET /auth/me` - Get current user profile
 
 ### Incidents
-- `GET /incidents` - List all incidents
+- `GET /incidents` - List all incidents with search/filter/pagination
 - `POST /incidents` - Create incident
 - `GET /incidents/{id}` - Get incident details
 - `PUT /incidents/{id}` - Update incident
@@ -155,7 +202,7 @@ Frontend will be available at `http://localhost:3000`
 - `POST /incidents/{id}/comments` - Add comment
 
 ### Vulnerabilities
-- `GET /vulnerabilities` - List vulnerabilities
+- `GET /vulnerabilities` - List vulnerabilities with search/filter/pagination
 - `POST /vulnerabilities` - Create vulnerability
 - `GET /vulnerabilities/{id}` - Get vulnerability details
 - `PUT /vulnerabilities/{id}` - Update vulnerability
@@ -163,10 +210,43 @@ Frontend will be available at `http://localhost:3000`
 - `POST /vulnerabilities/{id}/incidents/{incident_id}` - Link to incident
 
 ### Dashboard
-- `GET /dashboard` - Complete dashboard data
+- `GET /dashboard` - Complete dashboard data with stats and trends
 - `GET /dashboard/stats` - Statistics only
-- `GET /dashboard/trends` - Incident trends
+- `GET /dashboard/trends` - Incident trends (30-day history)
 - `GET /dashboard/severity-distribution` - Severity breakdown
+
+### Network Monitoring
+- `POST /network/wifi-config/detect` - Auto-detect router
+- `POST /network/wifi-config/test-connection` - Test router credentials
+- `POST /network/wifi-config` - Setup router configuration
+- `GET /network/wifi-config` - Get current router config
+- `POST /network/wifi-config/sync` - Sync devices from router
+- `GET /network/devices` - List connected devices
+- `GET /network/devices/{id}` - Get device details
+- `GET /network/devices/{id}/dns-history` - Get device DNS history
+- `GET /network/dns-logs` - Get all DNS queries
+- `GET /network/dns-logs/blocked` - Get blocked queries
+- `POST /network/dns-logs/import` - Import DNS logs
+- `GET /network/stats` - Get network analytics
+- `POST /network/policies` - Create network policy
+- `GET /network/policies` - List policies
+- `PUT /network/policies/{id}` - Update policy
+- `DELETE /network/policies/{id}` - Delete policy
+
+### Alerts & Notifications
+- `GET /alerts` - List alerts
+- `PUT /alerts/{id}` - Mark alert as read
+- `DELETE /alerts/{id}` - Delete alert
+
+### Webhooks
+- `POST /integrations/webhooks` - Create webhook
+- `GET /integrations/webhooks` - List webhooks
+- `PUT /integrations/webhooks/{id}` - Update webhook
+- `DELETE /integrations/webhooks/{id}` - Delete webhook
+
+### Reports & Audit
+- `GET /reports` - Generate reports
+- `GET /audit-logs` - Get audit log history
 
 ## 🚢 Production Deployment
 
@@ -208,13 +288,23 @@ Already configured with:
 - **incidents** - Security incidents
 - **vulnerabilities** - CVE tracking
 - **comments** - Team collaboration
+- **incident_vulnerabilities** - Relationship mapping
+
+### Network Monitoring (NEW)
+- **connected_devices** - WiFi connected devices with stats
+- **dns_logs** - DNS query history with categorization
+- **site_categories** - Domain categorization database
+- **wifi_configs** - Router configuration storage
+- **network_policies** - Network access control rules
 
 ### Audit & Compliance
-- **audit_logs** - Full change history
-- **alerts** - Notifications
-- **api_keys** - Integration keys
-- **webhooks** - External integrations
-- **notification_preferences** - User settings
+- **audit_logs** - Full change history for compliance
+- **alerts** - Notification system
+- **api_keys** - Integration API keys
+- **webhooks** - External service integrations
+- **notification_preferences** - User notification settings
+
+**Total Tables:** 16 with proper indexes, foreign keys, and multi-tenant isolation
 
 ## 🔧 Configuration
 
@@ -282,17 +372,43 @@ curl http://localhost:3000
 - Backend: FastAPI is 3x faster than Flask, connection pooling enabled
 - Database: Indexed queries, prepared statements, connection pooling
 
+## 🌐 Network Monitoring Setup
+
+### Supported Routers
+1. **Tenda F3** - Home routers with web interface
+2. **Ubiquiti UniFi** - Enterprise WiFi controllers
+3. **Cisco Meraki** - Cloud-managed WiFi
+4. **TP-Link** - Popular budget routers
+5. **Mikrotik RouterOS** - Advanced routing
+
+### Quick Setup
+1. Go to `/network/settings`
+2. Click "🔍 Detect My Router" or "📝 Enter Manually"
+3. Enter your router admin password
+4. Click "Test & Save"
+5. Go to `/network` and click "Sync Now"
+
+### Features
+- Auto-discover connected devices
+- Track websites visited (DNS logs)
+- Block content categories via policies
+- View per-device internet history
+- Monitor bandwidth usage
+- Real-time device status
+
 ## 🔐 Security Best Practices
 
 ✅ Implemented:
 - Bcrypt password hashing (cost factor 12)
-- JWT token authentication
-- CORS protection
+- JWT token authentication with refresh
+- CORS protection with origin validation
 - SQL injection prevention (parameterized queries)
 - Environment variable secrets management
 - Row-Level Security (RLS) for multi-tenant isolation
 - HTTPS ready (automatic with Vercel/Render)
 - Audit logging for compliance
+- Rate limiting (100 req/min per IP)
+- Network monitoring with user consent
 
 ## 🎓 Learning Value
 
@@ -300,17 +416,25 @@ This project demonstrates:
 - Full-stack production architecture
 - Modern Python web framework (FastAPI)
 - React with Next.js best practices
-- PostgreSQL advanced features
-- Cloud deployment patterns
-- Security-first development
+- PostgreSQL advanced features with proper indexing
+- Cloud deployment patterns (Vercel, Render, Supabase)
+- Security-first development approach
 - Team collaboration features
 - Real-world incident management
+- Network monitoring and device tracking
+- Email and webhook integrations
+- Rate limiting and API security
+- Multi-tenant application design
+- Async operations and non-blocking requests
+- Professional UI with proper iconography
 
 Perfect for:
-- Portfolio showcase
-- Learning modern web development
-- Understanding security operations
-- Enterprise application design
+- Portfolio showcase of full-stack development
+- Learning modern web development best practices
+- Understanding security operations and monitoring
+- Enterprise application design patterns
+- Network security and monitoring implementation
+- Integration with real hardware (WiFi routers)
 
 ## 📞 Support
 
