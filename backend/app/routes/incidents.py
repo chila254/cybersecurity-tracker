@@ -20,7 +20,7 @@ from uuid import UUID
 from datetime import datetime
 import asyncio
 
-router = APIRouter(prefix="/incidents", tags=["Incidents"])
+router = APIRouter(tags=["Incidents"])
 
 # ============================================================================
 # List Incidents with Search, Filters & Pagination

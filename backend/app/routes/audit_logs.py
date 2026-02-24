@@ -12,7 +12,7 @@ from app.auth import get_current_user
 from uuid import UUID
 
 
-router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
+router = APIRouter(tags=["Audit Logs"])
 
 
 @router.get("")

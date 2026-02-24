@@ -21,7 +21,7 @@ from app.services.wifi_service import WiFiService
 from app.services.dns_service import DNSService
 from app.services.router_detection_service import RouterDetectionService
 
-router = APIRouter(prefix="/network", tags=["Network Monitoring"])
+router = APIRouter(tags=["Network Monitoring"])
 
 # ============================================================================
 # Router Auto-Detection

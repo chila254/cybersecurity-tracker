@@ -12,7 +12,7 @@ from app.auth import get_current_user
 from uuid import UUID
 from datetime import datetime
 
-router = APIRouter(prefix="/alerts", tags=["Alerts"])
+router = APIRouter(tags=["Alerts"])
 
 # ============================================================================
 # List Alerts

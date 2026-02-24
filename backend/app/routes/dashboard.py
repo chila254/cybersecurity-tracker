@@ -12,7 +12,7 @@ from app.schemas import DashboardStats, DashboardResponse, IncidentTrend, Severi
 from app.auth import get_current_user
 from datetime import datetime, timedelta
 
-router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+router = APIRouter(tags=["Dashboard"])
 
 # ============================================================================
 # Dashboard Statistics
