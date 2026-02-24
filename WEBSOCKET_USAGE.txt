@@ -1,0 +1,240 @@
+================================================================================
+WEBSOCKET REAL-TIME UPDATES - QUICK SETUP
+================================================================================
+
+WHAT'S NEW:
+- Real-time incident updates without page refresh
+- Real-time vulnerability updates
+- Real-time dashboard metrics
+- Auto-reconnect with exponential backoff
+- Connection status indicator in UI
+
+================================================================================
+BACKEND ENDPOINTS
+================================================================================
+
+WebSocket Endpoints:
+  ws://localhost:8000/api/ws/incidents?token=YOUR_JWT_TOKEN
+  ws://localhost:8000/api/ws/vulnerabilities?token=YOUR_JWT_TOKEN
+  ws://localhost:8000/api/ws/dashboard?token=YOUR_JWT_TOKEN
+
+REST Endpoint:
+  GET /api/ws/connections - Check active WebSocket connections
+
+================================================================================
+FRONTEND SETUP
+================================================================================
+
+The incidents page now automatically:
+1. Connects to WebSocket endpoint on page load
+2. Listens for real-time incident updates
+3. Updates the UI instantly when incidents change
+4. Shows connection status (Live/Offline badge)
+5. Auto-reconnects if connection drops
+
+No configuration needed! Just use the incidents page normally.
+
+================================================================================
+MESSAGE TYPES
+================================================================================
+
+Incident Events:
+  {
+    "type": "incident_created",
+    "entity": "incident",
+    "incident_id": 123,
+    "severity": "CRITICAL",
+    "data": {
+      "title": "SQL Injection Detected",
+      "status": "OPEN",
+      "incident_type": "data_breach"
+    }
+  }
+
+  {
+    "type": "incident_updated",
+    "entity": "incident",
+    "incident_id": 123,
+    "data": {
+      "status": "INVESTIGATING",
+      "assigned_to": "user-123"
+    }
+  }
+
+Connection Events:
+  {
+    "type": "connected",
+    "message": "Connected to incidents stream",
+    "connection_id": "uuid-here",
+    "user_id": "user-id",
+    "org_id": "org-id"
+  }
+
+Keep-Alive Ping:
+  Send from client: { "type": "ping" }
+  Server responds: { "type": "pong" }
+
+================================================================================
+BROWSER CONSOLE DEBUGGING
+================================================================================
+
+Open DevTools → Console to see WebSocket logs:
+
+  ✅ WebSocket connected
+  📨 WebSocket message: { type: 'incident_created', ... }
+  🔄 Reconnecting in 3000ms (attempt 1/5)
+  ❌ WebSocket disconnected
+  ❌ Failed to reconnect after multiple attempts
+
+================================================================================
+ENVIRONMENT VARIABLES
+================================================================================
+
+Frontend (.env.local):
+  NEXT_PUBLIC_API_URL=http://localhost:8000/api
+  
+Or for production:
+  NEXT_PUBLIC_API_URL=https://your-api-domain.com/api
+
+Backend (.env):
+  CORS_ORIGINS=["http://localhost:3000", "https://your-domain.com"]
+
+================================================================================
+HOW TO USE IN YOUR OWN COMPONENTS
+================================================================================
+
+1. Import the hook:
+   import { useWebSocket } from '@/hooks/useWebSocket'
+   import { useAuth } from '@/lib/auth-context'
+
+2. Use in component:
+   export function MyComponent() {
+     const { token, apiUrl } = useAuth()
+     
+     const { isConnected, lastMessage } = useWebSocket({
+       url: `${apiUrl?.replace('http', 'ws')}/ws/incidents`,
+       token: token || '',
+       enabled: !!token,
+       onMessage: (message) => {
+         if (message.type === 'incident_created') {
+           console.log('New incident:', message.data)
+         }
+       },
+     })
+     
+     return (
+       <div>
+         Status: {isConnected ? 'Live' : 'Offline'}
+       </div>
+     )
+   }
+
+================================================================================
+DEPLOYMENT CHECKLIST
+================================================================================
+
+Local Development:
+  ✓ Backend running on localhost:8000
+  ✓ Frontend running on localhost:3000
+  ✓ WebSocket connections work on http/ws
+
+Production (Vercel + Render):
+  ✓ Set NEXT_PUBLIC_API_URL in Vercel env vars
+  ✓ Add WSS (WebSocket Secure) support in FastAPI
+  ✓ CORS_ORIGINS includes your domain in Render env vars
+  ✓ SSL/TLS certificate for wss:// connections
+  ✓ Test WebSocket in browser DevTools
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Q: WebSocket shows "Offline" in incidents page
+A: Check:
+   - Token exists in localStorage
+   - NEXT_PUBLIC_API_URL environment variable is set
+   - Backend is running
+   - CORS_ORIGINS includes your frontend domain
+   - Check browser console for error messages
+
+Q: "Missing authentication token" error
+A: Make sure:
+   - You're logged in (token should be in localStorage)
+   - Page waited for auth context to load (useAuth() hook)
+   - Token is valid (not expired)
+
+Q: WebSocket keeps reconnecting
+A: Check:
+   - Backend CORS configuration
+   - Network connection stability
+   - Check server logs: docker logs -f [container]
+   - Verify JWT token expiration time
+
+Q: Real-time updates not working
+A: Verify:
+   - WebSocket connection shows "Live" in UI
+   - Browser console shows "📨 WebSocket message" logs
+   - Message type matches your listener (incident_created, incident_updated)
+   - Incident list automatically refreshes on new incident
+
+================================================================================
+PERFORMANCE NOTES
+================================================================================
+
+- Each WebSocket connection uses minimal resources
+- Connections are per-user (scoped to organization)
+- Auto-cleanup on page close or logout
+- Exponential backoff prevents reconnection spam
+- Works in the background (no UI blocking)
+
+Expected connection count:
+- Small team (5 users): ~5 active connections
+- Medium team (50 users): ~50 active connections
+- Large team (500+ users): Consider Redis pub/sub or message queue
+
+================================================================================
+MONITORING
+================================================================================
+
+Check active connections:
+  curl http://localhost:8000/api/ws/connections?token=YOUR_TOKEN
+
+Response:
+  {
+    "org_id": "org-123",
+    "active_connections": 5,
+    "total_connections": 12
+  }
+
+Monitor in production:
+  - Render dashboard → Logs
+  - Look for "✅ WebSocket connected" and "❌ WebSocket disconnected"
+  - Track reconnection attempts in error logs
+  - Monitor connection count over time
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+To extend WebSocket support:
+
+1. Add to vulnerability updates page (same pattern as incidents)
+2. Add to dashboard for real-time metrics
+3. Add user presence tracking (who's viewing what)
+4. Add real-time comments/chat in incidents
+5. Add notifications when assigned to you
+6. Add alert streaming for real-time security events
+
+See individual component files for examples.
+
+================================================================================
+QUESTIONS?
+================================================================================
+
+Check the code:
+  - backend/app/websocket.py (connection management)
+  - backend/app/routes/websocket_routes.py (endpoints)
+  - hooks/useWebSocket.ts (frontend hook)
+  - app/incidents/page.tsx (usage example)
+
+================================================================================
