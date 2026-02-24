@@ -15,6 +15,7 @@ from app.schemas import (
 from app.auth import get_current_user
 from app.services import email_service, WebhookService
 from app.validators import validate_string_field, validate_severity, validate_status
+from app.websocket import manager, create_incident_message
 from uuid import UUID
 from datetime import datetime
 import asyncio
@@ -158,6 +159,20 @@ async def create_incident(
             )
         )
         
+        # Broadcast WebSocket message to all connected clients
+        ws_message = create_incident_message(
+            incident_id=int(incident.id),
+            action="incident_created",
+            data={
+                "title": incident.title,
+                "severity": incident.severity,
+                "status": incident.status,
+                "incident_type": incident.incident_type,
+                "created_by": current_user["user_id"]
+            }
+        )
+        asyncio.create_task(manager.broadcast_to_org(str(current_user["org_id"]), ws_message))
+        
         return incident
     
     except Exception as e:
@@ -269,6 +284,19 @@ async def update_incident(
         )
         db.add(audit)
         db.commit()
+        
+        # Broadcast WebSocket message for incident update
+        ws_message = create_incident_message(
+            incident_id=int(incident.id),
+            action="incident_updated",
+            data={
+                "title": incident.title,
+                "severity": incident.severity,
+                "status": incident.status,
+                "assigned_to": str(incident.assigned_to) if incident.assigned_to else None
+            }
+        )
+        asyncio.create_task(manager.broadcast_to_org(str(current_user["org_id"]), ws_message))
         
         return incident
     

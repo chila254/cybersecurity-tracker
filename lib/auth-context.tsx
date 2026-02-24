@@ -121,5 +121,13 @@ export function useAuth() {
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider')
   }
-  return context
+  
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  
+  return {
+    ...context,
+    token,
+    apiUrl,
+  }
 }

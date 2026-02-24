@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Calendar, Tag, Server } from 'lucide-react'
+import { Search, Calendar, Tag, Server, Radio } from 'lucide-react'
+import { useWebSocket } from '@/hooks/useWebSocket'
+import { useAuth } from '@/lib/auth-context'
 
 interface Incident {
   id: string
@@ -20,9 +22,11 @@ interface Incident {
 }
 
 export default function IncidentsPage() {
+  const { token, apiUrl } = useAuth()
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [wsConnected, setWsConnected] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -44,6 +48,38 @@ export default function IncidentsPage() {
   // Bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkStatus, setBulkStatus] = useState('')
+
+  // WebSocket for real-time updates
+  const wsUrl = typeof window !== 'undefined' 
+    ? `${apiUrl?.replace('http', 'ws')}/ws/incidents`
+    : ''
+  
+  const { isConnected } = useWebSocket({
+    url: wsUrl,
+    token: token || '',
+    enabled: !!token,
+    onMessage: (message) => {
+      if (message.type === 'incident_created') {
+        console.log('🔔 New incident created:', message.data)
+        // Refresh incidents to show the new one
+        fetchIncidents()
+      } else if (message.type === 'incident_updated') {
+        console.log('🔄 Incident updated:', message.data)
+        // Update the specific incident in the list
+        setIncidents(prev => 
+          prev.map(inc => 
+            parseInt(inc.id) === message.incident_id 
+              ? { ...inc, ...message.data }
+              : inc
+          )
+        )
+      }
+    },
+  })
+
+  useEffect(() => {
+    setWsConnected(isConnected)
+  }, [isConnected])
 
   useEffect(() => {
     fetchIncidents()
@@ -176,7 +212,15 @@ export default function IncidentsPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Incidents</h1>
-          <p className="text-slate-400">Manage security incidents and investigations</p>
+          <div className="flex items-center gap-2">
+            <p className="text-slate-400">Manage security incidents and investigations</p>
+            <div className="flex items-center gap-1 ml-4 px-2 py-1 bg-slate-800 rounded text-xs">
+              <Radio className={`h-3 w-3 ${wsConnected ? 'text-green-500' : 'text-slate-500'}`} />
+              <span className={wsConnected ? 'text-green-400' : 'text-slate-400'}>
+                {wsConnected ? 'Live' : 'Offline'}
+              </span>
+            </div>
+          </div>
         </div>
         <Button
           onClick={() => setShowModal(true)}
