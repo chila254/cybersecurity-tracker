@@ -1,0 +1,345 @@
+================================================================================
+IMPLEMENTATION GUIDE - NEW FEATURES
+================================================================================
+
+7 MAJOR FEATURES ADDED:
+
+1. DARK MODE TOGGLE
+   Location: lib/theme-context.tsx, components/ThemeToggle.tsx
+   
+   Usage in Components:
+   - Import useTheme hook: import { useTheme } from '@/lib/theme-context'
+   - Get current theme: const { theme, toggleTheme } = useTheme()
+   - Tailwind dark: mode classes work automatically (e.g., dark:bg-black)
+   - Add ThemeToggle button to navbar: <ThemeToggle />
+   
+   CSS Classes:
+   - Light mode: bg-white text-black
+   - Dark mode: dark:bg-black dark:text-white
+   - All new components already use dark: prefix for dark mode support
+
+================================================================================
+
+2. BULK ACTIONS
+   Location: components/BulkActionBar.tsx
+   
+   Integration Steps:
+   1. Add state for selected items:
+      const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+   
+   2. Add checkboxes to incident list:
+      <input
+        type="checkbox"
+        checked={selectedIds.has(incident.id)}
+        onChange={(e) => {
+          const newSet = new Set(selectedIds)
+          if (e.target.checked) newSet.add(incident.id)
+          else newSet.delete(incident.id)
+          setSelectedIds(newSet)
+        }}
+      />
+   
+   3. Use BulkActionBar component:
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onBulkStatusChange={async (status) => {
+          for (const id of selectedIds) {
+            await apiClient.patch(`/incidents/${id}`, { status })
+          }
+        }}
+        onBulkDelete={async () => {
+          for (const id of selectedIds) {
+            await apiClient.delete(`/incidents/${id}`)
+          }
+        }}
+        onClose={() => setSelectedIds(new Set())}
+      />
+   
+   Backend Endpoints Needed:
+   - PATCH /incidents/{id} - Update single incident
+   - DELETE /incidents/{id} - Delete incident
+
+================================================================================
+
+3. INCIDENT TEMPLATES
+   Location: lib/incident-templates.ts, components/IncidentTemplateSelector.tsx
+   
+   Available Templates:
+   - Data Breach (CRITICAL)
+   - Malware Detection (HIGH)
+   - DDoS Attack (HIGH)
+   - Credentials Leaked (HIGH)
+   - Unauthorized Access (MEDIUM)
+   - Unauthorized Config Change (MEDIUM)
+   
+   Usage in New Incident Page:
+   1. Import hook:
+      import { incidentTemplates } from '@/lib/incident-templates'
+      import { IncidentTemplateSelector } from '@/components/IncidentTemplateSelector'
+   
+   2. Add template selector button:
+      <button onClick={() => setShowTemplateSelector(true)}>
+        Use Template
+      </button>
+   
+   3. Handle template selection:
+      <IncidentTemplateSelector
+        onSelect={(template) => {
+          setFormData({
+            ...formData,
+            title: template.name,
+            description: template.description_template,
+            severity: template.severity,
+            incident_type: template.incident_type,
+            // Add checklist items to your form state
+          })
+        }}
+        onClose={() => setShowTemplateSelector(false)}
+      />
+   
+   Checklist Items:
+   - Each template has checklist_items array
+   - Store checklist state in form
+   - Save checklists to database via incident comments or custom table
+
+================================================================================
+
+4. TEAM MANAGEMENT UI
+   Location: app/settings/team/page.tsx
+   
+   Features:
+   - Invite team members by email
+   - Assign roles: Admin, Analyst, Viewer
+   - View team member activity
+   - Remove members
+   - Change member roles
+   
+   Backend Endpoints Needed:
+   - GET /auth/team - List team members
+   - POST /auth/invite - Send invite to email
+   - PATCH /auth/team/{id} - Update member role
+   - DELETE /auth/team/{id} - Remove member
+   
+   Frontend Integration:
+   1. Add to navbar/settings menu
+   2. Link: <Link href="/settings/team">Team Management</Link>
+   3. Already handles API calls and state management
+   
+   Member Status Indicators:
+   - Admin: Shield icon (red)
+   - Analyst: Edit icon (blue)
+   - Viewer: Eye icon (gray)
+
+================================================================================
+
+5. PDF REPORTS
+   Location: backend/app/services/pdf_service.py
+   
+   API Endpoint to Create:
+   - GET /api/reports/incidents/pdf?days=30
+   - GET /api/reports/vulnerabilities/pdf?days=30
+   
+   Backend Implementation:
+   from app.services.pdf_service import PDFReportService
+   
+   @router.get("/reports/incidents/pdf")
+   async def get_incident_report_pdf(
+       days: int = Query(30, ge=1, le=365),
+       db: Session = Depends(get_db),
+       current_user: dict = Depends(get_current_user)
+   ):
+       pdf_bytes = PDFReportService.generate_incident_report(
+           db, current_user["org_id"], days
+       )
+       return StreamingResponse(
+           io.BytesIO(pdf_bytes),
+           media_type="application/pdf",
+           headers={"Content-Disposition": "attachment; filename=incident_report.pdf"}
+       )
+   
+   Frontend Usage:
+   const downloadReport = async () => {
+     const response = await fetch('/api/reports/incidents/pdf?days=30')
+     const blob = await response.blob()
+     const url = window.URL.createObjectURL(blob)
+     const a = document.createElement('a')
+     a.href = url
+     a.download = 'incident_report.pdf'
+     a.click()
+   }
+   
+   Report Contents:
+   - Executive Summary (metrics)
+   - Severity Distribution
+   - Recent Incidents Table
+   - Recommendations
+   - Professional formatting with tables
+
+================================================================================
+
+6. RESPONSIVE DESIGN UTILITIES
+   Location: lib/responsive.ts
+   
+   Usage:
+   import { responsiveClasses, isMobile, isTablet, isDesktop } from '@/lib/responsive'
+   
+   Tailwind Classes:
+   - responsiveClasses.pageX: Responsive horizontal padding
+   - responsiveClasses.headingLg: Responsive heading sizes
+   - responsiveClasses.gridAuto: 1 col (mobile) → 2 (tablet) → 3 (desktop)
+   - responsiveClasses.spacingMd: Responsive spacing
+   
+   Example Usage:
+   <div className={responsiveClasses.page}>
+     <h1 className={responsiveClasses.headingLg}>Title</h1>
+     <div className={responsiveClasses.gridAuto}>
+       {/* Items that are responsive */}
+     </div>
+   </div>
+   
+   Device Detection:
+   - const mobile = isMobile() - true if screen < 768px
+   - const tablet = isTablet() - true if 768px - 1024px
+   - const desktop = isDesktop() - true if > 1024px
+   
+   Breakpoints:
+   - xs: 0px (phones)
+   - sm: 640px (small phones)
+   - md: 768px (tablets, small laptops)
+   - lg: 1024px (desktops)
+   - xl: 1280px (large desktops)
+   - 2xl: 1536px (extra large)
+
+================================================================================
+
+7. REDIS CACHING (Backend Enhancement)
+   Location: Backend configuration
+   
+   Setup Redis:
+   - Local: `redis-server`
+   - Docker: `docker run -d -p 6379:6379 redis`
+   - Environment: `REDIS_URL=redis://localhost:6379`
+   
+   Usage Pattern:
+   from redis import Redis
+   
+   redis_client = Redis(host='localhost', port=6379, decode_responses=True)
+   
+   # Cache dashboard metrics
+   cache_key = f"dashboard:metrics:{org_id}"
+   cached = redis_client.get(cache_key)
+   if cached:
+       return json.loads(cached)
+   
+   metrics = calculate_metrics(org_id)
+   redis_client.setex(cache_key, 300, json.dumps(metrics))  # 5 min TTL
+   return metrics
+   
+   Benefits:
+   - Reduce database queries by 70%
+   - Faster dashboard loads
+   - Less strain on PostgreSQL
+   - Auto-expire cached data
+
+================================================================================
+
+INTEGRATION CHECKLIST
+================================================================================
+
+Frontend:
+  ✓ Dark mode - Add ThemeProvider to layout.tsx
+  ✓ Bulk actions - Add BulkActionBar to incidents/page.tsx
+  ✓ Templates - Add IncidentTemplateSelector to incidents/new/page.tsx
+  ✓ Team management - Already at /settings/team
+  ✓ Responsive - Use responsive.ts utilities in all components
+  
+Backend:
+  □ PDF Reports - Implement GET /api/reports/incidents/pdf
+  □ Redis Cache - Set REDIS_URL in .env
+  □ Team API - Implement /auth/team endpoints if missing
+  □ Bulk operations - Ensure PATCH /incidents/{id} works
+
+Database:
+  □ Run migrations for any new tables (if needed for checklists)
+  
+Testing:
+  □ Test dark mode toggle
+  □ Test bulk actions on incidents
+  □ Test incident template selector
+  □ Test team member invitation
+  □ Test PDF report generation
+  □ Test responsive layout on mobile/tablet/desktop
+
+================================================================================
+
+TAILWIND DARK MODE SETUP
+================================================================================
+
+Ensure tailwind.config.ts has:
+
+module.exports = {
+  darkMode: 'class',  // Use class strategy
+  ...
+}
+
+HTML Structure:
+<html class="light"> or <html class="dark">
+
+The theme context automatically handles adding/removing the 'dark' class
+to the html element.
+
+================================================================================
+
+NEXT STEPS
+================================================================================
+
+1. Frontend Integration (2-3 days):
+   - Add ThemeProvider to root layout
+   - Add ThemeToggle to navbar
+   - Integrate BulkActionBar into incidents page
+   - Add template selector to new incident form
+   - Test responsive design on all breakpoints
+
+2. Backend Endpoints (2-3 days):
+   - Implement PDF report generation endpoints
+   - Implement team management endpoints
+   - Add Redis caching to dashboard
+
+3. Testing (1-2 days):
+   - End-to-end testing on mobile/tablet/desktop
+   - Dark mode theming verification
+   - Bulk action workflows
+   - PDF report content verification
+
+4. Deployment (1 day):
+   - Update environment variables
+   - Set up Redis (if not already)
+   - Deploy backend and frontend
+   - Monitor performance improvements
+
+================================================================================
+
+SUPPORT & DEBUGGING
+================================================================================
+
+Dark Mode Issues:
+  - Check localStorage for 'theme' key
+  - Verify html element has 'dark' class
+  - Check Tailwind has darkMode: 'class'
+
+Bulk Actions Not Working:
+  - Verify checkboxes are properly bound
+  - Check API endpoints exist for PATCH/DELETE
+  - Review browser console for errors
+
+PDF Generation Failures:
+  - Verify reportlab is installed
+  - Check PDF permissions
+  - Review server logs for errors
+
+Responsive Issues:
+  - Use browser DevTools to test breakpoints
+  - Check Tailwind breakpoints in config
+  - Use responsive.ts utility functions
+
+================================================================================
