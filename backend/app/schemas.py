@@ -137,14 +137,14 @@ class IncidentResponse(BaseModel):
     status: IncidentStatus
     incident_type: IncidentType
     created_by: UUID
-    assigned_to: Optional[UUID]
+    assigned_to: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
-    resolved_at: Optional[datetime]
-    affected_systems: List[str]
-    external_reference_id: Optional[str]
+    resolved_at: Optional[datetime] = None
+    affected_systems: Optional[List[str]] = []
+    external_reference_id: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 # ============================================================================
 # Vulnerability Schemas
@@ -171,21 +171,21 @@ class VulnerabilityUpdate(BaseModel):
 
 class VulnerabilityResponse(BaseModel):
     id: UUID
-    cve_id: Optional[str]
+    cve_id: Optional[str] = None
     title: str
-    description: Optional[str]
-    cvss_score: Optional[float]
+    description: Optional[str] = None
+    cvss_score: Optional[float] = None
     severity: VulnSeverity
     status: VulnStatus
-    affected_systems: List[str]
-    remediation: Optional[str]
+    affected_systems: Optional[List[str]] = []
+    remediation: Optional[str] = None
     discovered_date: datetime
-    patch_available_date: Optional[datetime]
-    patched_date: Optional[datetime]
+    patch_available_date: Optional[datetime] = None
+    patched_date: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 # ============================================================================
 # Comment Schemas
