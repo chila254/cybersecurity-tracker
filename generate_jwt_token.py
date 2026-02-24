@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Generate a valid JWT token using your actual SECRET_KEY
+Generate a valid JWT token using your SECRET_KEY from Render
 Run: python3 generate_jwt_token.py
 """
 
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 import sys
+import os
 
 # Install PyJWT if needed
 try:
@@ -19,7 +20,6 @@ except ImportError:
 
 # Your actual SECRET_KEY from Render environment
 # Get this from your Render service environment variables
-import os
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours
@@ -54,7 +54,7 @@ def generate_token():
     print(f"  Role:         ADMIN")
     print(f"  Expires in:   {ACCESS_TOKEN_EXPIRE_MINUTES} minutes")
     print(f"  Algorithm:    {ALGORITHM}")
-    print(f"  Secret Key:   {SECRET_KEY[:20]}...")
+    print(f"  Secret Key:   {SECRET_KEY[:20]}..." if SECRET_KEY != "your-secret-key-here" else f"  Secret Key:   (not set - configure on Render)")
     print("\n" + "-"*90)
     
     print("\n📌 Usage Examples:\n")
