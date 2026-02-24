@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from app.database import get_db
 from app.models import Incident, Vulnerability
-from app.schemas import DashboardStats, DashboardResponse, IncidentTrend, SeverityDistribution
+from app.schemas import DashboardStats, DashboardResponse, IncidentTrend, SeverityDistribution, IncidentResponse
 from app.auth import get_current_user
 from datetime import datetime, timedelta
 
@@ -164,7 +164,7 @@ async def get_dashboard(
 # Most Recent Incidents
 # ============================================================================
 
-@router.get("/recent-incidents", response_model=list)
+@router.get("/recent-incidents", response_model=list[IncidentResponse])
 async def get_recent_incidents(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -179,7 +179,7 @@ async def get_recent_incidents(
         Incident.created_at.desc()
     ).limit(limit).all()
     
-    return incidents
+    return [IncidentResponse.model_validate(incident) for incident in incidents]
 
 # ============================================================================
 # Critical Vulnerabilities
