@@ -144,10 +144,10 @@ app.include_router(vulnerabilities.router, prefix="/api/vulnerabilities")
 app.include_router(dashboard.router, prefix="/api/dashboard")
 app.include_router(alerts.router, prefix="/api/alerts")
 app.include_router(integrations.router, prefix="/api/integrations")
-app.include_router(reports.router, prefix="/api")
-app.include_router(audit_logs.router, prefix="/api")
-app.include_router(network.router, prefix="/api")
-app.include_router(websocket_routes.router, prefix="/api")
+app.include_router(reports.router, prefix="/api/reports")
+app.include_router(audit_logs.router, prefix="/api/audit-logs")
+app.include_router(network.router, prefix="/api/network")
+app.include_router(websocket_routes.router, prefix="/api/ws")
 
 # ============================================================================
 # Run app

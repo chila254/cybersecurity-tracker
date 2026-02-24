@@ -15,7 +15,7 @@ from app.auth import get_current_user
 from app.services.reports_service import ReportsService
 
 
-router = APIRouter(prefix="/reports", tags=["Reports"])
+router = APIRouter(tags=["Reports"])
 
 
 @router.get("/monthly-summary")

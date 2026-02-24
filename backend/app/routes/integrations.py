@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 from datetime import datetime, timedelta
 import secrets
 
-router = APIRouter(prefix="/integrations", tags=["Integrations"])
+router = APIRouter(tags=["Integrations"])
 
 # ============================================================================
 # API Keys Management

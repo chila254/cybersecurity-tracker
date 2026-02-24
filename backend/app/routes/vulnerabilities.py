@@ -18,7 +18,7 @@ from uuid import UUID
 from datetime import datetime
 import asyncio
 
-router = APIRouter(prefix="/vulnerabilities", tags=["Vulnerabilities"])
+router = APIRouter(tags=["Vulnerabilities"])
 
 # ============================================================================
 # List Vulnerabilities with Search, Filters & Pagination
