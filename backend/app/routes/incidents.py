@@ -63,7 +63,7 @@ async def list_incidents(
     
     incidents = query.order_by(Incident.created_at.desc()).offset(skip).limit(limit).all()
     # Convert ORM objects to dicts to ensure proper Pydantic validation
-    return [IncidentResponse.model_validate(incident) for incident in incidents]
+    return [IncidentResponse.from_orm(incident) for incident in incidents]
 
 # ============================================================================
 # Get Single Incident
@@ -91,7 +91,7 @@ async def get_incident(
             detail="Incident not found"
         )
     
-    return IncidentResponse.model_validate(incident)
+    return IncidentResponse.from_orm(incident)
 
 # ============================================================================
 # Create Incident
@@ -174,7 +174,7 @@ async def create_incident(
         )
         asyncio.create_task(manager.broadcast_to_org(str(current_user["org_id"]), ws_message))
         
-        return IncidentResponse.model_validate(incident)
+        return IncidentResponse.from_orm(incident)
     
     except Exception as e:
         db.rollback()
@@ -299,7 +299,7 @@ async def update_incident(
         )
         asyncio.create_task(manager.broadcast_to_org(str(current_user["org_id"]), ws_message))
         
-        return IncidentResponse.model_validate(incident)
+        return IncidentResponse.from_orm(incident)
     
     except Exception as e:
         db.rollback()

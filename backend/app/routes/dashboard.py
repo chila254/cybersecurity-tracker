@@ -179,7 +179,7 @@ async def get_recent_incidents(
         Incident.created_at.desc()
     ).limit(limit).all()
     
-    return [IncidentResponse.model_validate(incident) for incident in incidents]
+    return [IncidentResponse.from_orm(incident) for incident in incidents]
 
 # ============================================================================
 # Critical Vulnerabilities

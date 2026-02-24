@@ -58,7 +58,7 @@ async def list_vulnerabilities(
         query = query.filter(Vulnerability.severity == severity)
     
     vulns = query.order_by(Vulnerability.discovered_date.desc()).offset(skip).limit(limit).all()
-    return [VulnerabilityResponse.model_validate(vuln) for vuln in vulns]
+    return [VulnerabilityResponse.from_orm(vuln) for vuln in vulns]
 
 # ============================================================================
 # Get Single Vulnerability
@@ -86,7 +86,7 @@ async def get_vulnerability(
             detail="Vulnerability not found"
         )
     
-    return VulnerabilityResponse.model_validate(vuln)
+    return VulnerabilityResponse.from_orm(vuln)
 
 # ============================================================================
 # Create Vulnerability
@@ -154,7 +154,7 @@ async def create_vulnerability(
                 )
             )
         
-        return VulnerabilityResponse.model_validate(vuln)
+        return VulnerabilityResponse.from_orm(vuln)
     
     except Exception as e:
         db.rollback()
@@ -264,7 +264,7 @@ async def update_vulnerability(
         db.add(audit)
         db.commit()
         
-        return VulnerabilityResponse.model_validate(vuln)
+        return VulnerabilityResponse.from_orm(vuln)
     
     except Exception as e:
         db.rollback()
