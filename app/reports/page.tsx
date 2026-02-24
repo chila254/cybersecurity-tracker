@@ -77,7 +77,7 @@ export default function ReportsPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/reports/${reportId}/export/csv`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
           }
         }
       )
