@@ -43,7 +43,7 @@ async def websocket_incidents(websocket: WebSocket, token: str = Query(None)):
             return
         
         user_id = payload.get("sub")
-        org_id = payload.get("org")
+        org_id = payload.get("org_id")
         
         if not user_id or not org_id:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing user or org in token")
@@ -108,7 +108,7 @@ async def websocket_vulnerabilities(websocket: WebSocket, token: str = Query(Non
             return
         
         user_id = payload.get("sub")
-        org_id = payload.get("org")
+        org_id = payload.get("org_id")
         
         if not user_id or not org_id:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing user or org in token")
@@ -169,7 +169,7 @@ async def websocket_dashboard(websocket: WebSocket, token: str = Query(None)):
             return
         
         user_id = payload.get("sub")
-        org_id = payload.get("org")
+        org_id = payload.get("org_id")
         
         if not user_id or not org_id:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing user or org in token")
@@ -220,7 +220,7 @@ async def get_active_connections(token: str = Query(None)):
     if not payload:
         return {"error": "Invalid token"}
     
-    org_id = payload.get("org")
+    org_id = payload.get("org_id")
     
     return {
         "org_id": org_id,
