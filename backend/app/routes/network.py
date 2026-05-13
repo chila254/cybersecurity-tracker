@@ -331,14 +331,14 @@ async def get_wifi_config(
 @router.post("/pihole/test-connection")
 async def test_pihole_connection(
     pihole_url: str,
-    api_key: Optional[str] = None,
+    password: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """Test connection to Pi-hole instance"""
     try:
-        async with PiHoleService(pihole_url, api_key) as pihole:
-            result = await pihole.test_connection()
-            return result
+        pihole = PiHoleService(pihole_url, password)
+        result = await pihole.test_connection()
+        return result
     except Exception as e:
         return {
             "success": False,
@@ -349,7 +349,7 @@ async def test_pihole_connection(
 @router.post("/pihole/setup", response_model=WiFiConfigResponse)
 async def setup_pihole_integration(
     pihole_url: str,
-    api_key: Optional[str] = None,
+    password: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -357,20 +357,20 @@ async def setup_pihole_integration(
     org_id = current_user["org_id"]
 
     # Check if Pi-hole connection works
-    async with PiHoleService(pihole_url, api_key) as pihole:
-        test_result = await pihole.test_connection()
-        if not test_result["success"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot connect to Pi-hole: {test_result.get('error', 'Unknown error')}"
-            )
+    pihole = PiHoleService(pihole_url, password)
+    test_result = await pihole.test_connection()
+    if not test_result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot connect to Pi-hole: {test_result.get('error', 'Unknown error')}"
+        )
 
     # Update existing config or create new one
     config = db.query(WiFiConfig).filter(WiFiConfig.org_id == org_id).first()
     if config:
         config.dns_log_source = "pihole"
         config.dns_log_url = pihole_url
-        config.dns_api_key = api_key
+        config.dns_api_key = password  # Using api_key field to store password
         config.is_enabled = True
         config.last_sync_at = datetime.utcnow()
     else:
@@ -383,7 +383,7 @@ async def setup_pihole_integration(
             router_password="",
             dns_log_source="pihole",
             dns_log_url=pihole_url,
-            dns_api_key=api_key,
+            dns_api_key=password,  # Using api_key field to store password
             is_enabled=True,
             last_sync_at=datetime.utcnow()
         )
@@ -413,8 +413,8 @@ async def sync_pihole_dns_logs(
     try:
         since_timestamp = int((datetime.utcnow().timestamp() - (since_hours * 3600)))
 
-        async with PiHoleService(config.dns_log_url, config.dns_api_key) as pihole:
-            imported_count = await pihole.sync_dns_logs_to_db(db, org_id, since_timestamp)
+        pihole = PiHoleService(config.dns_log_url, config.dns_api_key)  # dns_api_key stores password
+        imported_count = await pihole.sync_dns_logs_to_db(db, org_id, since_timestamp)
 
         # Update last sync time
         config.last_sync_at = datetime.utcnow()
@@ -450,8 +450,8 @@ async def get_pihole_stats(
                 detail="Pi-hole integration not configured"
             )
 
-        async with PiHoleService(config.dns_log_url, config.dns_api_key) as pihole:
-            stats = await pihole.get_stats()
+        pihole = PiHoleService(config.dns_log_url, config.dns_api_key)  # dns_api_key stores password
+        stats = await pihole.get_stats()
 
         return {
             "pihole_stats": stats,
