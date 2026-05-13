@@ -90,20 +90,25 @@ class DNSService:
     
     @staticmethod
     def categorize_domain(domain: str) -> str:
-        """Categorize a domain based on known categories"""
-        domain_lower = domain.lower().strip()
-        
-        # Direct match
-        if domain_lower in DOMAIN_CATEGORIES:
-            return DOMAIN_CATEGORIES[domain_lower]
-        
-        # Check if domain is a subdomain of known domain
-        for known_domain, category in DOMAIN_CATEGORIES.items():
-            if domain_lower.endswith("." + known_domain) or domain_lower == known_domain:
-                return category
-        
-        # Default category
-        return "unknown"
+        """Categorize a domain using enhanced categorizer"""
+        try:
+            from app.services.domain_categorizer import DomainCategorizer
+            return DomainCategorizer.categorize_domain(domain)
+        except ImportError:
+            # Fallback to basic categorization
+            domain_lower = domain.lower().strip()
+
+            # Direct match
+            if domain_lower in DOMAIN_CATEGORIES:
+                return DOMAIN_CATEGORIES[domain_lower]
+
+            # Check if domain is a subdomain of known domain
+            for known_domain, category in DOMAIN_CATEGORIES.items():
+                if domain_lower.endswith("." + known_domain) or domain_lower == known_domain:
+                    return category
+
+            # Default category
+            return "unknown"
     
     @staticmethod
     def get_risk_level(category: str) -> str:

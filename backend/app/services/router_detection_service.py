@@ -5,8 +5,13 @@ Automatically detect router type and configuration
 
 import httpx
 import asyncio
-from typing import Optional, Dict
+import socket
+import ipaddress
+import subprocess
+import platform
+from typing import Optional, Dict, List
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +20,12 @@ ROUTER_URLS = [
     "http://192.168.1.1",
     "http://192.168.0.1",
     "http://192.168.100.1",
+    "http://10.0.0.1",
     "http://tendawifi.com",
     "http://router.local",
     "https://192.168.1.1:8443",  # UniFi
     "https://192.168.1.1",
+    "https://192.168.0.1:8443",
 ]
 
 # Router detection signatures
@@ -64,37 +71,204 @@ class RouterDetectionService:
     @staticmethod
     async def detect_router() -> Optional[Dict]:
         """
-        Auto-detect router type and URL
+        Auto-detect router type and URL using multiple methods
         Returns: {"router_type": "unifi", "router_url": "http://...", "detected": True}
         """
-        
+
+        # Method 1: Try network scanning for common router IPs
+        logger.info("Scanning network for routers...")
+        network_routers = await RouterDetectionService._scan_network_for_routers()
+        if network_routers:
+            for router_info in network_routers:
+                logger.info(f"Found potential router: {router_info}")
+                # Test if it's actually a router
+                router_type = await RouterDetectionService._identify_router(router_info['url'])
+                if router_type:
+                    return {
+                        "router_type": router_type,
+                        "router_url": router_info['url'],
+                        "detected": True,
+                        "method": "network_scan",
+                        "message": f"Found {router_type.upper()} router at {router_info['url']} via network scan"
+                    }
+
+        # Method 2: Try ARP table analysis
+        logger.info("Checking ARP table for router...")
+        arp_routers = await RouterDetectionService._check_arp_table()
+        if arp_routers:
+            for router_info in arp_routers:
+                router_type = await RouterDetectionService._identify_router(router_info['url'])
+                if router_type:
+                    return {
+                        "router_type": router_type,
+                        "router_url": router_info['url'],
+                        "detected": True,
+                        "method": "arp_table",
+                        "message": f"Found {router_type.upper()} router at {router_info['url']} via ARP table"
+                    }
+
+        # Method 3: Try common URLs (fallback)
+        logger.info("Trying common router URLs...")
         for url in ROUTER_URLS:
             try:
-                # Try to detect router type
                 router_type = await RouterDetectionService._identify_router(url)
-                
+
                 if router_type:
                     logger.info(f"Detected {router_type} router at {url}")
                     return {
                         "router_type": router_type,
                         "router_url": url,
                         "detected": True,
+                        "method": "common_urls",
                         "message": f"Found {router_type.upper()} router at {url}"
                     }
-            
+
             except Exception as e:
                 logger.debug(f"Router not found at {url}: {str(e)}")
                 continue
-        
+
         return {
             "detected": False,
             "message": "Could not auto-detect router. Please enter details manually.",
             "suggestions": [
                 "Try logging in to http://tendawifi.com",
                 "Or try http://192.168.1.1 or http://192.168.0.1",
-                "Check your router documentation for the IP address"
+                "Check your router documentation for the IP address",
+                "Run 'arp -a' in terminal to find your router IP"
             ]
         }
+
+    @staticmethod
+    async def _scan_network_for_routers() -> List[Dict]:
+        """
+        Scan local network for potential routers
+        """
+        try:
+            routers = []
+
+            # Get local IP and subnet
+            local_ip = RouterDetectionService._get_local_ip()
+            if not local_ip:
+                return routers
+
+            # Calculate subnet (assume /24 for common home networks)
+            ip_parts = local_ip.split('.')
+            subnet = f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.0/24"
+
+            # Common router IPs to check in subnet
+            potential_router_ips = [
+                f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.1",  # .1
+                f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.254",  # .254
+                f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.100",  # Some ISP routers
+            ]
+
+            # Test each potential IP
+            for ip in potential_router_ips:
+                try:
+                    # Quick TCP connect test on common router ports
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(1)
+                    result = sock.connect_ex((ip, 80))
+                    sock.close()
+
+                    if result == 0:  # Port 80 open
+                        routers.append({
+                            'ip': ip,
+                            'url': f"http://{ip}",
+                            'method': 'port_scan'
+                        })
+
+                    # Also test HTTPS
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(1)
+                    result = sock.connect_ex((ip, 443))
+                    sock.close()
+
+                    if result == 0:  # Port 443 open
+                        routers.append({
+                            'ip': ip,
+                            'url': f"https://{ip}",
+                            'method': 'port_scan'
+                        })
+
+                except Exception as e:
+                    logger.debug(f"Failed to test {ip}: {str(e)}")
+                    continue
+
+            return routers
+
+        except Exception as e:
+            logger.error(f"Network scanning failed: {str(e)}")
+            return []
+
+    @staticmethod
+    async def _check_arp_table() -> List[Dict]:
+        """
+        Check ARP table for potential router IPs
+        """
+        try:
+            routers = []
+
+            # Get ARP table
+            if platform.system() == "Windows":
+                arp_output = subprocess.check_output(["arp", "-a"], universal_newlines=True)
+            else:  # Linux/Mac
+                arp_output = subprocess.check_output(["arp", "-n"], universal_newlines=True)
+
+            # Parse ARP entries
+            lines = arp_output.strip().split('\n')
+            for line in lines:
+                parts = re.split(r'\s+', line.strip())
+                if len(parts) >= 3:
+                    ip = parts[1] if platform.system() == "Windows" else parts[0]
+                    mac = parts[2] if platform.system() == "Windows" else parts[2]
+
+                    # Check if this looks like a router IP (common patterns)
+                    if RouterDetectionService._is_likely_router_ip(ip):
+                        routers.append({
+                            'ip': ip,
+                            'mac': mac,
+                            'url': f"http://{ip}",
+                            'method': 'arp_table'
+                        })
+
+            return routers
+
+        except Exception as e:
+            logger.error(f"ARP table check failed: {str(e)}")
+            return []
+
+    @staticmethod
+    def _get_local_ip() -> Optional[str]:
+        """
+        Get local IP address
+        """
+        try:
+            # Create a socket to determine local IP
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))  # Connect to Google DNS
+            local_ip = s.getsockname()[0]
+            s.close()
+            return local_ip
+        except Exception as e:
+            logger.debug(f"Could not determine local IP: {str(e)}")
+            return None
+
+    @staticmethod
+    def _is_likely_router_ip(ip: str) -> bool:
+        """
+        Check if IP looks like a router IP
+        """
+        try:
+            ip_obj = ipaddress.ip_address(ip)
+            if ip_obj.is_private:
+                # Common router IPs
+                octets = ip.split('.')
+                last_octet = int(octets[3])
+                return last_octet in [1, 254, 100, 10, 2]  # Common router IPs
+            return False
+        except:
+            return False
 
     @staticmethod
     async def _identify_router(url: str) -> Optional[str]:
