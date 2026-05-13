@@ -3,14 +3,11 @@ Network Monitoring API routes
 WiFi device tracking and DNS log monitoring
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
 from uuid import UUID
 from datetime import datetime, timedelta
-import json
-import asyncio
-from typing import List
 from app.database import get_db
 from app.auth import get_current_user
 from app.models import (
@@ -23,8 +20,6 @@ from app.schemas import (
 from app.services.wifi_service import WiFiService
 from app.services.dns_service import DNSService
 from app.services.router_detection_service import RouterDetectionService
-from app.services.pihole_service import PiHoleService
-from app.services.network_monitor import NetworkMonitor
 
 router = APIRouter(tags=["Network Monitoring"])
 
@@ -120,213 +115,10 @@ async def setup_wifi_config(
         )
 
 # ============================================================================
-# Real-time Network Monitoring
+# Pi-hole Integration (Official API)
 # ============================================================================
 
-# Global network monitor instance (per organization)
-network_monitors = {}
-
-@router.post("/monitoring/start")
-async def start_network_monitoring(
-    interface: str = Query(None),
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """Start real-time network monitoring for device detection"""
-    org_id = str(current_user["org_id"])
-
-    if org_id in network_monitors and network_monitors[org_id].is_monitoring:
-        return {
-            "status": "already_running",
-            "message": "Network monitoring is already active"
-        }
-
-    try:
-        monitor = NetworkMonitor(interface)
-        network_monitors[org_id] = monitor
-
-        # Add callback to save detected devices to database
-        async def device_callback(event_type, data):
-            try:
-                if event_type == "device_connected":
-                    # Save new device to database
-                    device_data = data
-                    existing = db.query(ConnectedDevice).filter(
-                        ConnectedDevice.org_id == current_user["org_id"],
-                        ConnectedDevice.mac_address == device_data["mac"]
-                    ).first()
-
-                    if not existing:
-                        new_device = ConnectedDevice(
-                            org_id=current_user["org_id"],
-                            mac_address=device_data["mac"],
-                            ip_address=device_data["ip"],
-                            device_name=device_data.get("hostname", ""),
-                            device_type="unknown",  # Will be determined later
-                            is_online=True,
-                            connected_at=device_data["last_seen"],
-                            router_model="network_monitor"
-                        )
-                        db.add(new_device)
-                        db.commit()
-
-            except Exception as e:
-                logger.error(f"Database callback error: {str(e)}")
-
-        monitor.add_callback(device_callback)
-
-        success = await monitor.start_monitoring()
-        if success:
-            return {
-                "status": "started",
-                "interface": monitor.interface,
-                "message": f"Network monitoring started on interface {monitor.interface}"
-            }
-        else:
-            return {
-                "status": "failed",
-                "message": "Failed to start network monitoring"
-            }
-
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to start monitoring: {str(e)}"
-        }
-
-@router.post("/monitoring/stop")
-async def stop_network_monitoring(
-    current_user: dict = Depends(get_current_user)
-):
-    """Stop real-time network monitoring"""
-    org_id = str(current_user["org_id"])
-
-    if org_id not in network_monitors:
-        return {
-            "status": "not_running",
-            "message": "Network monitoring is not active"
-        }
-
-    try:
-        monitor = network_monitors[org_id]
-        monitor.stop_monitoring()
-        del network_monitors[org_id]
-
-        return {
-            "status": "stopped",
-            "message": "Network monitoring stopped"
-        }
-
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to stop monitoring: {str(e)}"
-        }
-
-@router.get("/monitoring/status")
-async def get_monitoring_status(
-    current_user: dict = Depends(get_current_user)
-):
-    """Get current monitoring status"""
-    org_id = str(current_user["org_id"])
-
-    if org_id not in network_monitors:
-        return {
-            "active": False,
-            "interface": None,
-            "device_count": 0
-        }
-
-    monitor = network_monitors[org_id]
-    devices = monitor.get_connected_devices()
-
-    return {
-        "active": monitor.is_monitoring,
-        "interface": monitor.interface,
-        "device_count": len(devices),
-        "devices": devices
-    }
-
-@router.websocket("/ws/monitoring")
-async def websocket_monitoring(
-    websocket: WebSocket,
-    current_user: dict = Depends(get_current_user)
-):
-    """WebSocket endpoint for real-time device monitoring"""
-    await websocket.accept()
-    org_id = str(current_user["org_id"])
-
-    try:
-        # Create monitor if not exists
-        if org_id not in network_monitors:
-            monitor = NetworkMonitor()
-            network_monitors[org_id] = monitor
-
-            # Add callback to send updates via WebSocket
-            async def ws_callback(event_type, data):
-                try:
-                    await websocket.send_json({
-                        "event": event_type,
-                        "data": data,
-                        "timestamp": datetime.utcnow().isoformat()
-                    })
-                except Exception as e:
-                    logger.error(f"WebSocket callback error: {str(e)}")
-
-            monitor.add_callback(ws_callback)
-
-            # Start monitoring if not already running
-            if not monitor.is_monitoring:
-                await monitor.start_monitoring()
-
-        monitor = network_monitors[org_id]
-
-        # Send initial device list
-        devices = monitor.get_connected_devices()
-        await websocket.send_json({
-            "event": "initial_devices",
-            "data": devices,
-            "timestamp": datetime.utcnow().isoformat()
-        })
-
-        # Keep connection alive and listen for messages
-        while True:
-            # Wait for client messages (could be used for commands)
-            try:
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=30)
-                # Process any client commands here
-            except asyncio.TimeoutError:
-                # Send ping to keep connection alive
-                await websocket.send_json({"event": "ping"})
-
-    except WebSocketDisconnect:
-        logger.info("WebSocket monitoring connection closed")
-    except Exception as e:
-        logger.error(f"WebSocket monitoring error: {str(e)}")
-    finally:
-        # Cleanup if needed
-        pass
-
-@router.get("/wifi-config", response_model=WiFiConfigResponse)
-async def get_wifi_config(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """Get WiFi configuration for organization"""
-    org_id = current_user["org_id"]
-
-    config = db.query(WiFiConfig).filter(WiFiConfig.org_id == org_id).first()
-    if not config:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="WiFi configuration not found"
-        )
-
-    return config
-
-# ============================================================================
-# Pi-hole Integration
-# ============================================================================
+from app.services.pihole_service import PiHoleService
 
 @router.post("/pihole/test-connection")
 async def test_pihole_connection(
@@ -334,10 +126,15 @@ async def test_pihole_connection(
     password: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Test connection to Pi-hole instance"""
+    """Test connection to Pi-hole instance using official API"""
     try:
         pihole = PiHoleService(pihole_url, password)
         result = await pihole.test_connection()
+
+        # Add API docs URL if connection successful
+        if result["success"]:
+            result["api_docs_url"] = await pihole.get_api_docs_url()
+
         return result
     except Exception as e:
         return {
@@ -455,7 +252,8 @@ async def get_pihole_stats(
 
         return {
             "pihole_stats": stats,
-            "last_sync": config.last_sync_at.isoformat() if config.last_sync_at else None
+            "last_sync": config.last_sync_at.isoformat() if config.last_sync_at else None,
+            "api_docs_url": await pihole.get_api_docs_url()
         }
 
     except Exception as e:
@@ -465,6 +263,23 @@ async def get_pihole_stats(
         )
     finally:
         db.close()
+
+@router.get("/wifi-config", response_model=WiFiConfigResponse)
+async def get_wifi_config(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get WiFi configuration for organization"""
+    org_id = current_user["org_id"]
+    
+    config = db.query(WiFiConfig).filter(WiFiConfig.org_id == org_id).first()
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="WiFi configuration not found"
+        )
+    
+    return config
 
 @router.post("/wifi-config/sync")
 async def sync_devices(

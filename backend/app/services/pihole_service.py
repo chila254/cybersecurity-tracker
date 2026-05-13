@@ -1,6 +1,11 @@
 """
 Pi-hole Integration Service
 Integrate with Pi-hole for real-time DNS monitoring and website tracking
+
+Based on official Pi-hole API implementation:
+https://github.com/pi-hole/pi-hole/blob/master/advanced/Scripts/api.sh
+
+API Documentation: http://pi.hole/api/docs (served locally by Pi-hole)
 """
 
 import asyncio
@@ -15,77 +20,158 @@ import logging
 logger = logging.getLogger(__name__)
 
 class PiHoleService:
-    """Service for integrating with Pi-hole DNS server"""
+    """Service for integrating with Pi-hole DNS server using official API"""
 
     def __init__(self, pihole_url: str, password: Optional[str] = None):
         self.pihole_url = pihole_url.rstrip('/')
         self.password = password
-        self.session = None
         self.sid = None
         self.csrf = None
-        self.session_expires = None
+        self.needs_auth = None  # Will be determined during connection test
 
-    async def __aenter__(self):
-        self.session = httpx.AsyncClient(timeout=10)
-        return self
+    async def test_connection(self) -> Dict:
+        """
+        Test connection to Pi-hole API and determine auth requirements
+        Based on TestAPIAvailability() from official api.sh
+        """
+        try:
+            # First test basic connectivity
+            async with httpx.AsyncClient(verify=False, timeout=10) as client:
+                # Test the auth endpoint to see if API is available
+                response = await client.get(f"{self.pihole_url}/api/auth")
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session:
-            await self.session.aclose()
+                if response.status_code == 200:
+                    # API available without authentication
+                    self.needs_auth = False
+                    data = response.json()
+                    return {
+                        'success': True,
+                        'needs_auth': False,
+                        'version': data.get('version', 'unknown'),
+                        'message': 'Pi-hole API accessible without authentication'
+                    }
+
+                elif response.status_code == 401:
+                    # API requires authentication
+                    self.needs_auth = True
+                    data = response.json()
+                    needs_totp = data.get('session', {}).get('totp', False)
+                    return {
+                        'success': True,
+                        'needs_auth': True,
+                        'needs_totp': needs_totp,
+                        'message': 'Pi-hole API requires authentication'
+                    }
+
+                else:
+                    return {
+                        'success': False,
+                        'error': f'Unexpected response: {response.status_code}',
+                        'message': 'Pi-hole API not responding correctly'
+                    }
+
+        except httpx.ConnectError:
+            return {
+                'success': False,
+                'error': 'Connection failed',
+                'message': 'Cannot connect to Pi-hole. Check URL and network connectivity.'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'message': 'Failed to test Pi-hole connection'
+            }
 
     async def authenticate(self) -> bool:
         """
-        Authenticate with Pi-hole and get session ID
+        Authenticate with Pi-hole using session-based auth
+        Based on LoginAPI() and Authentication() from official api.sh
         """
-        if not self.password:
-            # If no password set, Pi-hole might not require authentication
+        if not self.needs_auth or not self.password:
             return True
 
         try:
             async with httpx.AsyncClient(verify=False, timeout=10) as client:
-                url = f"{self.pihole_url}/api/auth"
+                # POST to /api/auth with password
                 payload = {"password": self.password}
+                response = await client.post(
+                    f"{self.pihole_url}/api/auth",
+                    json=payload,
+                    headers={"User-Agent": "Cybersecurity Tracker"}
+                )
 
-                response = await client.post(url, json=payload)
-                response.raise_for_status()
+                if response.status_code != 200:
+                    logger.error(f"Auth failed with status {response.status_code}")
+                    return False
 
                 data = response.json()
-                if 'session' in data and data['session'].get('valid'):
-                    self.sid = data['session']['sid']
-                    self.csrf = data['session'].get('csrf')
-                    self.session_expires = data['session']['validity']
+                session = data.get('session', {})
+
+                if session.get('valid'):
+                    self.sid = session.get('sid')
+                    self.csrf = session.get('csrf')
                     logger.info("Successfully authenticated with Pi-hole")
                     return True
                 else:
-                    logger.error(f"Authentication failed: {data}")
+                    error_msg = data.get('error', {}).get('message', 'Unknown error')
+                    logger.error(f"Authentication failed: {error_msg}")
                     return False
 
         except Exception as e:
             logger.error(f"Authentication error: {str(e)}")
             return False
 
-    async def _ensure_authenticated(self) -> bool:
+    async def logout(self) -> bool:
         """
-        Ensure we have a valid session
+        Logout from Pi-hole session
+        Based on LogoutAPI() from official api.sh
         """
-        if not self.sid and self.password:
-            return await self.authenticate()
-        return True
+        if not self.sid:
+            return True
 
-    async def _make_authenticated_request(self, method: str, endpoint: str,
-                                        params: Dict = None, json_data: Dict = None) -> Dict:
-        """
-        Make an authenticated request to Pi-hole API
-        """
-        await self._ensure_authenticated()
+        try:
+            async with httpx.AsyncClient(verify=False, timeout=10) as client:
+                response = await client.delete(
+                    f"{self.pihole_url}/api/auth",
+                    headers={
+                        "X-FTL-SID": self.sid,
+                        "Accept": "application/json"
+                    }
+                )
 
-        url = f"{self.pihole_url}{endpoint}"
+                if response.status_code == 204:
+                    logger.info("Successfully logged out from Pi-hole")
+                    self.sid = None
+                    self.csrf = None
+                    return True
+                else:
+                    logger.warning(f"Logout returned status {response.status_code}")
+                    return False
 
-        headers = {}
+        except Exception as e:
+            logger.error(f"Logout error: {str(e)}")
+            return False
+
+    async def _make_api_request(self, method: str, endpoint: str,
+                               params: Optional[Dict] = None,
+                               json_data: Optional[Dict] = None) -> Dict:
+        """
+        Make authenticated API request to Pi-hole
+        Based on GetFTLData() and PostFTLData() from official api.sh
+        """
+        # Ensure we're authenticated if needed
+        if self.needs_auth and not self.sid:
+            if not await self.authenticate():
+                raise Exception("Failed to authenticate with Pi-hole")
+
+        url = f"{self.pihole_url}/api{endpoint}"
+        headers = {"Accept": "application/json"}
+
         if self.sid:
-            headers['X-FTL-SID'] = self.sid
+            headers["X-FTL-SID"] = self.sid
             if self.csrf:
-                headers['X-FTL-CSRF'] = self.csrf
+                headers["X-FTL-CSRF"] = self.csrf
 
         async with httpx.AsyncClient(verify=False, timeout=30) as client:
             if method.upper() == 'GET':
@@ -93,48 +179,30 @@ class PiHoleService:
             elif method.upper() == 'POST':
                 response = await client.post(url, headers=headers, json=json_data, params=params)
             else:
-                raise ValueError(f"Unsupported method: {method}")
+                raise ValueError(f"Unsupported HTTP method: {method}")
 
             response.raise_for_status()
             return response.json()
 
-    async def test_connection(self) -> Dict:
+    async def get_stats(self) -> Dict:
         """
-        Test connection to Pi-hole API
+        Get Pi-hole statistics
         """
         try:
-            # Try to get basic info without authentication first
-            data = await self._make_authenticated_request('GET', '/api/info/version')
-
+            data = await self._make_api_request('GET', '')
             return {
-                'success': True,
-                'version': data.get('version', 'unknown'),
-                'message': 'Successfully connected to Pi-hole'
+                'domains_being_blocked': data.get('domains_being_blocked', 0),
+                'dns_queries_today': data.get('dns_queries_today', 0),
+                'ads_blocked_today': data.get('ads_blocked_today', 0),
+                'ads_percentage_today': data.get('ads_percentage_today', 0),
+                'unique_domains': data.get('unique_domains', 0),
+                'queries_forwarded': data.get('queries_forwarded', 0),
+                'queries_cached': data.get('queries_cached', 0),
+                'clients_ever_seen': data.get('clients_ever_seen', 0)
             }
-
         except Exception as e:
-            # Try without authentication for basic endpoints
-            try:
-                async with httpx.AsyncClient(verify=False, timeout=10) as client:
-                    response = await client.get(f"{self.pihole_url}/api.php")
-                    response.raise_for_status()
-
-                    data = response.json()
-                    if 'domains_being_blocked' in data:
-                        return {
-                            'success': True,
-                            'version': data.get('version', 'unknown'),
-                            'domains_blocked': data.get('domains_being_blocked', 0),
-                            'message': 'Successfully connected to Pi-hole (no auth required)'
-                        }
-            except Exception as inner_e:
-                pass
-
-            return {
-                'success': False,
-                'error': str(e),
-                'message': 'Could not connect to Pi-hole API'
-            }
+            logger.error(f"Failed to get Pi-hole stats: {str(e)}")
+            return {}
 
     async def get_recent_queries(self, limit: int = 100) -> List[Dict]:
         """
@@ -142,7 +210,7 @@ class PiHoleService:
         """
         try:
             params = {'recent': '', 'limit': str(limit)}
-            data = await self._make_authenticated_request('GET', '/api.php', params=params)
+            data = await self._make_api_request('GET', '', params=params)
 
             queries = []
             if 'data' in data:
@@ -176,7 +244,7 @@ class PiHoleService:
             if until_timestamp:
                 params['until'] = str(until_timestamp)
 
-            data = await self._make_authenticated_request('GET', '/api.php', params=params)
+            data = await self._make_api_request('GET', '', params=params)
 
             queries = []
             if 'data' in data:
@@ -194,28 +262,6 @@ class PiHoleService:
         except Exception as e:
             logger.error(f"Failed to get Pi-hole logs: {str(e)}")
             return []
-
-    async def get_stats(self) -> Dict:
-        """
-        Get Pi-hole statistics
-        """
-        try:
-            data = await self._make_authenticated_request('GET', '/api.php')
-
-            return {
-                'domains_being_blocked': data.get('domains_being_blocked', 0),
-                'dns_queries_today': data.get('dns_queries_today', 0),
-                'ads_blocked_today': data.get('ads_blocked_today', 0),
-                'ads_percentage_today': data.get('ads_percentage_today', 0),
-                'unique_domains': data.get('unique_domains', 0),
-                'queries_forwarded': data.get('queries_forwarded', 0),
-                'queries_cached': data.get('queries_cached', 0),
-                'clients_ever_seen': data.get('clients_ever_seen', 0)
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to get Pi-hole stats: {str(e)}")
-            return {}
 
     async def sync_dns_logs_to_db(self, db: Session, org_id: int,
                                  since_timestamp: Optional[int] = None) -> int:
@@ -273,23 +319,15 @@ class PiHoleService:
             logger.error(f"Failed to sync DNS logs: {str(e)}")
             return 0
 
-    async def add_custom_blocklist(self, domains: List[str]) -> Dict:
+    async def get_api_docs_url(self) -> str:
         """
-        Add domains to Pi-hole blocklist
+        Get the URL for Pi-hole's local API documentation
         """
-        try:
-            # This would require Pi-hole's gravity update or API
-            # For now, return not implemented
-            result = {
-                'success': False,
-                'error': 'Custom blocklist management not yet implemented',
-                'message': 'Use Pi-hole admin interface to manage blocklists'
-            }
-            return result
-        except Exception as e:
-            error_result = {
-                'success': False,
-                'error': str(e)
-            }
-            return error_result
+        return f"{self.pihole_url}/api/docs"
 
+    # Context manager support for automatic logout
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.logout()
