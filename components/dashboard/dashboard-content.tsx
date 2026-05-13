@@ -157,7 +157,10 @@ export function DashboardContent() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Security Overview Chart */}
           <div className="xl:col-span-2">
-            <SecurityOverview data={data} />
+            <div className="bg-slate-900 rounded-xl border border-slate-700 p-6">
+              <h2 className="text-lg font-bold text-white mb-4">Security Overview</h2>
+              <p className="text-slate-400">Chart components temporarily disabled</p>
+            </div>
           </div>
 
           {/* Network Status */}
