@@ -1,16 +1,23 @@
 'use client'
 
-import { useAuth } from '@/lib/auth-context'
-
-export const dynamic = 'force-dynamic'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Shield, Lock, Users, FileText, BarChart3, AlertCircle, AlertTriangle, FileText as FileTextIcon } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default function Home() {
-  const { isAuthenticated } = useAuth()
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token')
+    const user = localStorage.getItem('user')
+    if (token && user) {
+      setIsAuthenticated(true)
+    }
+  }, [])
 
   useEffect(() => {
     if (isAuthenticated) {
