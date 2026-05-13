@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Shield, Lock, Users, FileText, BarChart3, AlertCircle, AlertTriangle, FileText as FileTextIcon } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'edge'
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
